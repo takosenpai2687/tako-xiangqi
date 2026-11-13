@@ -26,3 +26,30 @@
 - 技术栈：Three.js、TypeScript。
 - 3D 场景与模型由 AI 辅助构建，贴图由 AI 辅助生成并整理。
 - 音效由 EventLabs 生成。
+
+## English
+
+Play Chinese chess with a friend in a quiet Japanese-style tea room. The game supports local two-player matches and keeps the original chess rules. AI opponents are not available yet.
+
+**Play now:** [https://tako-xiangqi.netlify.app](https://tako-xiangqi.netlify.app)
+
+### Features
+
+- A realistic 3D board, pieces, and tea room with warm lighting, tea cups, and rising steam.
+- Click or drag pieces to move; legal destinations appear when a piece is selected.
+- Rotate and zoom the view, with a smooth camera turn when players switch sides.
+- Piece selection, movement, captures, and captured-piece storage have animations.
+- Distinct red and black move sounds, plus piece pickup, capture, and undo sounds.
+- Undo, restart, and a victory screen.
+
+### Controls
+
+- Select a piece and then a legal destination, or drag the piece to move it.
+- Drag from an empty area to rotate the view; use the mouse wheel to zoom.
+- Use the on-screen controls to undo or restart.
+
+### Credits
+
+- Tech stack: Three.js and TypeScript.
+- The 3D scene and models were AI-assisted; textures were AI-assisted and prepared for the game.
+- Sound effects were generated with EventLabs.

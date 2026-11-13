@@ -1,3 +1,4 @@
+import { DefaultLoadingManager } from "three";
 import { BoardRenderer } from "./board-renderer";
 import { GameController, type GameState } from "./game-controller";
 import "./styles.css";
@@ -13,6 +14,11 @@ const viewport = requireElement<HTMLElement>("board-viewport");
 const rendererError = requireElement<HTMLElement>("renderer-error");
 const menuScreen = requireElement<HTMLElement>("menu-screen");
 const gameScreen = requireElement<HTMLElement>("game-screen");
+const loadingScreen = requireElement<HTMLElement>("loading-screen");
+const loadingMeter = requireElement<HTMLElement>("loading-meter");
+const loadingMeterFill = requireElement<HTMLElement>("loading-meter-fill");
+const loadingStatus = requireElement<HTMLElement>("loading-status");
+const loadingPercent = requireElement<HTMLElement>("loading-percent");
 const turnStatuses = requireElement<HTMLElement>("turn-statuses");
 const redTurnState = requireElement<HTMLElement>("red-turn-state");
 const blackTurnState = requireElement<HTMLElement>("black-turn-state");
@@ -28,6 +34,71 @@ const sides = window.XiangqiRules.constants.sides;
 
 let renderer: BoardRenderer | null = null;
 let game: GameController | null = null;
+let loadingErrors = 0;
+let loadingFinished = false;
+const loadingStartedAt = performance.now();
+
+function setLoadingProgress(progress: number): void {
+  const value = Math.max(0, Math.min(100, Math.floor(progress)));
+  loadingMeter.setAttribute("aria-valuenow", String(value));
+  loadingMeterFill.style.width = `${value}%`;
+  loadingPercent.textContent = `${value}%`;
+}
+
+function loadingMessageFor(url: string): string {
+  const asset = url.toLowerCase();
+  if (asset.includes("board-walnut")) return "正在打磨棋盘纹理…";
+  if (asset.includes("xiangqi-pieces")) return "棋子正在入阵…";
+  if (asset.includes("tea")) return "茶香渐渐升起…";
+  if (asset.includes("tatami") || asset.includes("shoji") || asset.includes("wall-plaster")) {
+    return "正在布置棋室…";
+  }
+  return "棋局正在展开…";
+}
+
+function finishLoading(message: string): void {
+  if (loadingFinished) return;
+  loadingFinished = true;
+  setLoadingProgress(100);
+  loadingStatus.textContent = message;
+
+  const minimumVisibleTime = loadingErrors > 0 ? 1200 : 520;
+  const remainingTime = Math.max(
+    200,
+    minimumVisibleTime - (performance.now() - loadingStartedAt),
+  );
+  window.setTimeout(() => {
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        loadingScreen.classList.add("is-done");
+        loadingScreen.setAttribute("aria-hidden", "true");
+        window.setTimeout(() => {
+          loadingScreen.hidden = true;
+        }, 320);
+      });
+    });
+  }, remainingTime);
+}
+
+DefaultLoadingManager.onStart = url => {
+  if (!loadingFinished) loadingStatus.textContent = loadingMessageFor(url);
+};
+DefaultLoadingManager.onProgress = (url, loaded, total) => {
+  if (loadingFinished) return;
+  setLoadingProgress(total > 0 ? (loaded / total) * 100 : 0);
+  loadingStatus.textContent = loadingErrors > 0
+    ? `还有 ${Math.max(total - loaded, 0)} 项棋室素材待完成…`
+    : loadingMessageFor(url);
+};
+DefaultLoadingManager.onError = () => {
+  loadingErrors += 1;
+  loadingStatus.textContent = "有些棋室素材暂时没有载入…";
+};
+DefaultLoadingManager.onLoad = () => {
+  finishLoading(
+    loadingErrors > 0 ? "部分素材未能载入，棋局仍可继续" : "棋局准备就绪",
+  );
+};
 
 function describeState(state: GameState): void {
   const redTurn = state.turn === sides.red;
@@ -98,6 +169,7 @@ try {
   rendererError.textContent =
     "无法启动 3D 棋盘。请使用支持 WebGL 的现代浏览器并重新载入页面。";
   startButton.disabled = true;
+  finishLoading("棋盘启动失败");
 }
 
 if (import.meta.hot) {
