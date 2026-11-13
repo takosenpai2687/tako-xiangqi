@@ -9,8 +9,32 @@
       content="一张实木棋盘上的 3D 中国象棋，支持本机双人对弈。"
     />
     <title>tako-xiangqi · 3D 中国象棋</title>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag() {
+        window.dataLayer.push(arguments);
+      }
+      gtag("js", new Date());
+      window.dataLayer.push({
+        "gtm.start": new Date().getTime(),
+        event: "gtm.js",
+      });
+    </script>
+    <script
+      async
+      src="https://www.googletagmanager.com/gtm.js?id=GTM-WZPB5HT8"
+    ></script>
   </head>
   <body>
+    <noscript>
+      <iframe
+        src="https://www.googletagmanager.com/ns.html?id=GTM-WZPB5HT8"
+        height="0"
+        width="0"
+        title="Google Tag Manager"
+        style="display: none; visibility: hidden"
+      ></iframe>
+    </noscript>
     <div class="app-shell">
       <div class="board-viewport" id="board-viewport" aria-hidden="true">
         <canvas id="board-canvas"></canvas>
