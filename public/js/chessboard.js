@@ -1,70 +1,8 @@
 class Chessboard {
   constructor(l) {
     this.state = [];
-    this.height = 11 * l;
-    this.width = 10 * l;
     this.l = l;
     this.initChessboard();
-  }
-
-  render() {
-    this.drawBoard(vc);
-    this.drawChess(vc);
-  }
-
-  drawBoard(ctx) {
-    const l = this.l;
-    // draw background
-    ctx.fillStyle = cfg.background;
-    ctx.fillRect(0, 0, this.width, this.height);
-    // draw horizontal lines
-    ctx.strokeStyle = cfg.lineColor;
-    ctx.lineWidth = cfg.lineWidth;
-    for (let i = 1; i <= 10; i++) {
-      this.drawLine(ctx, l, i * l, 9 * l, i * l);
-    }
-    // draw vertical lines
-    for (let i = 1; i <= 9; i++) {
-      if (i === 1 || i === 9) {
-        this.drawLine(ctx, i * l, l, i * l, 10 * l);
-      } else {
-        this.drawLine(ctx, i * l, l, i * l, 5 * l);
-        this.drawLine(ctx, i * l, 6 * l, i * l, 10 * l);
-      }
-    }
-    // draw x lines
-    this.drawLine(ctx, 4 * l, l, 6 * l, 3 * l);
-    this.drawLine(ctx, 4 * l, 3 * l, 6 * l, l);
-    this.drawLine(ctx, 4 * l, 8 * l, 6 * l, 10 * l);
-    this.drawLine(ctx, 4 * l, 10 * l, 6 * l, 8 * l);
-  }
-
-  drawChess(ctx) {
-    const chessList = Object.values(this.state)
-      .flat(2)
-      .filter(el => {
-        return el != null;
-      });
-    chessList.forEach(chess => {
-      let { x, y } = this.getChessPos(chess);
-      chess.render(ctx, x, y);
-    });
-  }
-
-  getChessPos(chess) {
-    const row = chess.row;
-    const col = chess.col;
-    const l = this.l;
-    return {
-      x: (col + 1) * l,
-      y: (row + 1) * l
-    };
-  }
-
-  drawLine(ctx, xi, yi, xf, yf) {
-    ctx.moveTo(xi, yi);
-    ctx.lineTo(xf, yf);
-    ctx.stroke();
   }
 
   putChess(chess) {
@@ -80,7 +18,6 @@ class Chessboard {
     chess.row = row;
     chess.col = col;
     this.putChess(chess);
-    this.render();
   }
 
   refreshChessPos() {
@@ -282,6 +219,7 @@ class Chessboard {
       this.putChess(chess);
     });
 
-    this.render();
   }
 }
+
+window.XiangqiRules = { Chessboard, constants };

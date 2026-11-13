@@ -1,39 +1,147 @@
-<!DOCTYPE html>
-<html lang="en">
+<!doctype html>
+<html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta http-equiv="X-UA-Compatible" content="ie=edge" />
-    <title>中国象棋</title>
-    <link rel="stylesheet" href="./css/reset.css" />
-    <link rel="stylesheet" href="./css/style.css" />
-    <script src="./js/jquery.js"></script>
+    <meta name="theme-color" content="#111518" />
+    <meta
+      name="description"
+      content="一张实木棋盘上的 3D 中国象棋，支持本机双人对弈。"
+    />
+    <title>tako-xiangqi · 3D 中国象棋</title>
   </head>
   <body>
-    <div class="header">
-      <p>中国象棋</p>
-    </div>
-    <div class="content-wrapper">
-      <div class="tools-container">
-        <div class="black-tools">
-          <p class="turn-tag black">黑方出棋</p>
-        </div>
-        <div class="red-tools">
-          <p class="turn-tag red">红方出棋</p>
-        </div>
+    <div class="app-shell">
+      <div class="board-viewport" id="board-viewport" aria-hidden="true">
+        <canvas id="board-canvas"></canvas>
       </div>
-      <div class="canvas-container">
-        <canvas id="controller"></canvas>
-        <canvas id="viewer"></canvas>
-      </div>
+
+      <main class="menu-screen" id="menu-screen">
+        <section class="menu-panel" aria-label="选择游戏模式">
+          <h1>中国象棋</h1>
+          <div class="mode-list">
+            <button class="mode-button mode-local" id="btn-local" type="button">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="8" cy="7" r="3" />
+                <path d="M2 20v-3a6 6 0 0 1 12 0v3M16 4a3 3 0 0 1 0 6M18 13a5 5 0 0 1 4 5v2" />
+              </svg>
+              <span>本机对战</span>
+              <svg class="mode-arrow" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M5 12h14m-6-6 6 6-6 6" />
+              </svg>
+            </button>
+            <button
+              class="mode-button mode-ai"
+              id="btn-ai"
+              type="button"
+              disabled
+              aria-label="人机对战，即将开放"
+              title="人机对战暂未开放"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 3v3M5 9h14v11H5zM2 12v5m20-5v5M8 16h8" />
+                <path d="M8 12h1m6 0h1" />
+              </svg>
+              <span>人机对战</span>
+              <svg class="mode-arrow" viewBox="0 0 24 24" aria-hidden="true">
+                <rect x="6" y="10" width="12" height="10" rx="2" />
+                <path d="M9 10V7a3 3 0 0 1 6 0v3m-3 4v2" />
+              </svg>
+            </button>
+          </div>
+        </section>
+        <div class="renderer-error" id="renderer-error" role="alert" hidden></div>
+      </main>
+
+      <main class="game-screen" id="game-screen" hidden>
+        <h1 class="sr-only">中国象棋 · tako-xiangqi</h1>
+        <div class="hud-home">
+          <button
+            class="hud-button back-button"
+            id="btn-menu"
+            type="button"
+            aria-label="返回主菜单"
+            title="返回主菜单"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="m14 5-7 7 7 7M7 12h13" />
+            </svg>
+          </button>
+          <span class="hud-mark" aria-hidden="true">弈境</span>
+        </div>
+
+        <div class="hud-turn">
+          <div class="turn-statuses" id="turn-statuses" role="status" aria-label="当前回合">
+            <span class="turn-state turn-state-red is-active" id="red-turn-state">红方行棋</span>
+            <span class="turn-state turn-state-black" id="black-turn-state">黑方行棋</span>
+          </div>
+          <button
+            class="hud-button view-button"
+            id="btn-view"
+            type="button"
+            aria-label="切换棋盘视角"
+            title="切换棋盘视角"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M20 7v5h-5M4 17v-5h5M6 7a7 7 0 0 1 12 1M18 17a7 7 0 0 1-12-1" />
+            </svg>
+          </button>
+        </div>
+
+        <div class="sr-only" id="selection-note" aria-live="polite" hidden></div>
+
+        <div class="hud-players" aria-label="棋手">
+          <span class="player-chip" id="red-player">
+            <span class="player-marker" aria-hidden="true"></span>
+            <span>红方</span>
+          </span>
+          <span class="player-chip" id="black-player">
+            <span class="player-marker" aria-hidden="true"></span>
+            <span>黑方</span>
+          </span>
+        </div>
+        <div class="hud-actions">
+          <button
+            class="hud-button action-button"
+            id="btn-undo"
+            type="button"
+            aria-label="悔棋"
+            title="悔棋"
+            disabled
+          >
+            <span>悔棋</span>
+          </button>
+          <button
+            class="hud-button action-button"
+            id="btn-new-game"
+            type="button"
+            aria-label="重开"
+            title="重开"
+          >
+            <span>重开</span>
+          </button>
+        </div>
+      </main>
     </div>
-    <div class="footer">
-      <button id="btn-undo">悔棋</button>
-    </div>
+
+    <dialog
+      class="result-dialog"
+      id="result-dialog"
+      aria-labelledby="result-title"
+    >
+      <span class="result-emblem" id="result-emblem" aria-hidden="true">帅</span>
+      <h2 id="result-title">红方获胜</h2>
+      <button class="dialog-button" id="btn-rematch" type="button">
+        <span>再来一局</span>
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M5 12h14m-6-6 6 6-6 6" />
+        </svg>
+      </button>
+    </dialog>
+
+    <script src="./js/constants.js"></script>
+    <script src="./js/chess.js"></script>
+    <script src="./js/chessboard.js"></script>
+    <script type="module" src="/src/main.ts"></script>
   </body>
-  <script src="./js/constants.js"></script>
-  <script src="./js/chess.js"></script>
-  <script src="./js/chessboard.js"></script>
-  <script src="./js/game.js"></script>
-  <script src="./js/index.js"></script>
 </html>
