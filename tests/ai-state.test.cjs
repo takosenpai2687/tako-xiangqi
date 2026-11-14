@@ -70,8 +70,8 @@ function createGame(humanSide = rules.constants.sides.red) {
   const engine = {
     resets: 0,
     reset() { this.resets++; },
-    search(fen) {
-      return new Promise(resolve => searches.push({ fen, resolve }));
+    search(fen, level) {
+      return new Promise(resolve => searches.push({ fen, level, resolve }));
     },
   };
   const game = new GameController(renderer, {
@@ -90,6 +90,55 @@ function createGame(humanSide = rules.constants.sides.red) {
 const flush = () => new Promise(resolve => setImmediate(resolve));
 const initialFen = "rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RNBAKABNR w - - 0 1";
 const hintResult = { move: { from: { row: 6, col: 0 }, to: { row: 5, col: 0 } }, score: null };
+
+test("changing hint difficulty replaces an active request and uses the new level", async () => {
+  const fixture = createGame();
+  const { game, engine, searches } = fixture;
+  const oldHint = game.requestHint();
+  await flush();
+  assert.equal(searches[0].level, "normal");
+  const previousResets = engine.resets;
+  game.setHintLevel("hard");
+  assert.equal(engine.resets, previousResets + 1);
+  assert.equal(fixture.state().hintLevel, "hard");
+  assert.equal(fixture.state().hintThinking, true);
+  searches[0].resolve(hintResult);
+  await oldHint;
+  assert.equal(fixture.state().selected, null);
+  await flush();
+  assert.equal(searches.length, 2);
+  assert.equal(searches[1].level, "hard");
+  searches[1].resolve({
+    move: { from: { row: 6, col: 2 }, to: { row: 5, col: 2 } },
+    score: null,
+  });
+  await flush();
+  assert.equal(fixture.state().selected, game.board.state[6][2]);
+  assert.equal(fixture.hint().col, 2);
+  assert.equal(fixture.state().hintThinking, false);
+  game.setHintLevel("hard");
+  await flush();
+  assert.equal(searches.length, 2, "unchanged difficulty must not restart the search");
+});
+
+test("changing hint difficulty starts a hint without a prior request, but not on the AI turn", async () => {
+  const fixture = createGame();
+  const { game, searches } = fixture;
+  game.setHintLevel("easy");
+  await flush();
+  assert.equal(searches.length, 1);
+  assert.equal(searches[0].level, "easy");
+  searches[0].resolve(hintResult);
+  await flush();
+  assert.equal(fixture.hint().col, 0);
+  game.movePiece({ row: 5, col: 0 });
+  game.setHintLevel("hard");
+  await flush();
+  assert.equal(searches.length, 1);
+  assert.equal(fixture.state().hintLevel, "hard");
+  assert.equal(fixture.state().hintThinking, false);
+  assert.equal(fixture.hint(), null);
+});
 
 for (const humanSide of [rules.constants.sides.red, rules.constants.sides.black]) {
   test(`only AI moves reset search history when human side is ${humanSide}`, () => {

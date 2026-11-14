@@ -99,7 +99,9 @@ export class GameController {
     if (level === this.hintLevel) return;
     this.hintLevel = level;
     this.clearHint();
-    this.notify();
+    this.ai?.engine.reset();
+    if (this.canHint) void this.requestHint();
+    else this.notify();
   }
 
   private get canHint(): boolean {

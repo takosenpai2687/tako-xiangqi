@@ -18,7 +18,7 @@ Play Chinese chess with a friend in a quiet Japanese-style tea room, or challeng
 ### Controls
 
 - **Move:** click a piece, then a highlighted destination, or drag it there. Click the selected piece again to deselect.
-- **Hint:** in AI games, click Hint to select a recommended piece and mark its destination with a pulsing red ring. Use the gear beside it to change hint difficulty; selecting another piece or deselecting clears the hint.
+- **Hint:** in AI games, click Hint to select a recommended piece and mark its destination with a pulsing red ring. Use the gear beside it to change hint difficulty, which recalculates the hint on your turn; selecting another piece or deselecting clears the hint.
 - **View:** drag an empty area to rotate, scroll to zoom, or use Reset view to return to the default angle.
 - **Undo / Restart:** undo a move or start over. In AI games, undo returns to your previous turn.
 - **Tea:** click your own cup on your turn to take a sip.
@@ -49,7 +49,7 @@ Play Chinese chess with a friend in a quiet Japanese-style tea room, or challeng
 ### 操作方式
 
 - **走棋：**点击棋子，再点击高亮落点，也可直接拖动落子。再次点击已选棋子可取消选中。
-- **提示：**人机模式下点击“提示”，自动选中推荐棋子，并以红色呼吸光圈标出落点。旁边的齿轮可调整提示难度；切换棋子或取消选中即可退出提示。
+- **提示：**人机模式下点击“提示”，自动选中推荐棋子，并以红色呼吸光圈标出落点。旁边的齿轮可调整提示难度，轮到你时切换会立即重新计算；切换棋子或取消选中即可退出提示。
 - **视角：**拖动空白处旋转，滚轮缩放；点击“恢复视角”回到默认角度。
 - **悔棋 / 重开：**撤回走棋或重新开始；人机模式下悔棋会回到你上一次走棋前。
 - **喝茶：**轮到你时，点击自己的茶杯喝一口。
