@@ -18,7 +18,7 @@ Play Chinese chess with a friend in a quiet Japanese-style tea room, or challeng
 - Undo, restart, and a victory screen.
 - Chinese and English UI: defaults to Chinese for a Chinese browser language, otherwise English. Choose from the main menu; your choice is saved locally and takes priority on future visits. Piece textures remain unchanged.
 - Graphics settings for ambient occlusion, depth of field, anti-aliasing, and volumetric light.
-- Automatic resource routing: mainland China (`CN`) uses Shanghai OSS; other regions use same-origin Netlify assets. Override the source in Graphics (reloads the page).
+- Automatic resource routing: Alibaba Cloud for mainland China, Netlify for other regions.
 
 ### Controls
 
@@ -26,15 +26,6 @@ Play Chinese chess with a friend in a quiet Japanese-style tea room, or challeng
 - Drag from an empty area to rotate the view; use the mouse wheel to zoom.
 - 🍵 Your move, your tea break. Click your cup on your turn to take a sip—no rush!
 - Use the on-screen controls to undo or restart.
-
-### Resource hosting
-
-- Netlify deploys `netlify/edge-functions/region.js` at `/api/region` to read the visitor's country code. The response is not cached; no external IP service or database is used.
-- Only `CN` selects `https://tako-threejs.oss-cn-shanghai.aliyuncs.com/tako-xiangqi/`. All other country codes, including `HK`, `MO`, and `TW`, select same-origin resources. A failed or unavailable lookup falls back to same-origin after a 2.5-second timeout and logs a warning. A VPN is classified by its exit IP.
-- OSS contains `textures/`, `audio/`, `pikafish.wasm`, and `pikafish.data`. Worker and engine JavaScript remain same-origin; all local assets must stay in the Netlify deployment.
-- Allow CORS `GET`/`HEAD` for the production origin and any local development origins. Serve WASM as `application/wasm`. Keep Netlify's COOP/COEP headers for the threaded engine.
-- Vite development and preview do not execute Netlify Edge Functions. Use the manual resource source setting to test OSS locally; automatic mode logs a warning and uses local resources.
-- Source overrides persist locally and reload the page. Engine data is cached by engine version, shared between sources. Upload matching resource versions to OSS before deploying. Transfer acceleration and R2 are not used.
 
 ### Credits
 
@@ -59,7 +50,7 @@ Play Chinese chess with a friend in a quiet Japanese-style tea room, or challeng
 - 支持悔棋、重开与胜局提示。
 - 首次访问跟随浏览器语言：中文环境默认中文，其余默认英文。主菜单可切换语言，本机记住选择，下次访问优先使用；棋子贴图不变。
 - 可调整环境光遮蔽、景深、抗锯齿与体积光。
-- 自动资源分流：中国大陆（`CN`）使用上海 OSS，其余地区使用 Netlify 同源资源；画面设置中可手动选择线路（切换后刷新页面）。
+- 资源按地区自动分流：中国大陆使用阿里云，其他地区使用 Netlify。
 
 ### 操作方式
 
@@ -67,13 +58,6 @@ Play Chinese chess with a friend in a quiet Japanese-style tea room, or challeng
 - 从棋子以外的位置拖动可旋转视角；滚轮可缩放。
 - 🍵 棋可以慢慢想，茶可别凉了。轮到你时，点点自己的茶杯，先喝一口～
 - 使用界面上的“悔棋”和“重开”进行对应操作。
-
-### 资源托管
-
-- Netlify Edge Function 提供不缓存的 `/api/region`，读取访问 IP 的地区代码，不依赖外部 IP 服务或数据库。只有 `CN` 使用上海 OSS，其他地区使用同源资源；查询失败或超时（2.5 秒）会记录警告并使用同源资源。VPN 按出口 IP 判断。
-- OSS 基础地址为 `https://tako-threejs.oss-cn-shanghai.aliyuncs.com/tako-xiangqi/`，包含 `textures/`、`audio/`、`pikafish.wasm`、`pikafish.data`；引擎 JS 和 Worker 保持同源，Netlify 部署需保留所有原资源。
-- OSS CORS 需允许正式站点及本地开发来源的 `GET`、`HEAD`；WASM 类型为 `application/wasm`。保留 Netlify COOP/COEP 响应头以支持多线程引擎。
-- Vite 本地开发及预览不执行 Edge Function，自动模式会警告并使用本地资源；可在画面设置中手动选阿里云测试。选择保存在本机，切换会刷新页面。两条线路共用同版本引擎数据缓存；发布前需同步 OSS 资源。不使用传输加速或 R2。
 
 ### 制作信息
 
