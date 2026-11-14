@@ -2,6 +2,7 @@ import { DefaultLoadingManager } from "three";
 import { BoardRenderer } from "./board-renderer";
 import { GameController, type GameState } from "./game-controller";
 import { AiEngine, type AiLevel } from "./ai-engine";
+import { constants } from "./rules";
 import "./styles.css";
 
 function requireElement<T extends HTMLElement>(id: string): T {
@@ -37,7 +38,7 @@ const engineLoading = requireElement<HTMLElement>("engine-loading");
 const engineLoadingFill = requireElement<HTMLElement>("engine-loading-fill");
 const engineLoadingPercent = requireElement<HTMLElement>("engine-loading-percent");
 const engineError = requireElement<HTMLElement>("engine-error");
-const sides = window.XiangqiRules.constants.sides;
+const sides = constants.sides;
 
 const ROSTER_GLYPHS = {
   red: ["帅", "仕", "相", "傌", "俥", "炮", "兵"],

@@ -7,6 +7,7 @@ import type {
 } from "./domain";
 import { BoardRenderer } from "./board-renderer";
 import { GameAudio } from "./game-audio";
+import { Chessboard, constants } from "./rules";
 import { toFen, type AiEngine, type AiLevel } from "./ai-engine";
 
 interface PieceSnapshot {
@@ -45,7 +46,7 @@ export interface GameView {
 }
 
 export class GameController {
-  private readonly rules = window.XiangqiRules.constants;
+  private readonly rules = constants;
   private board: ChessboardModel;
   private turn = this.rules.sides.red;
   private selected: ChessPiece | null = null;
@@ -71,7 +72,7 @@ export class GameController {
   constructor(renderer: BoardRenderer, view: GameView) {
     this.renderer = renderer;
     this.view = view;
-    this.board = new window.XiangqiRules.Chessboard(1);
+    this.board = new Chessboard();
     this.history = [this.snapshot()];
     this.renderer.setActionHandler(action => this.handleBoardAction(action));
     this.renderer.setTeaSoundHandler(sound => this.audio.play(TEA_SOUNDS[sound]));
@@ -114,7 +115,7 @@ export class GameController {
 
   newGame(): void {
     this.cancelAi();
-    this.board = new window.XiangqiRules.Chessboard(1);
+    this.board = new Chessboard();
     this.turn = this.rules.sides.red;
     this.selected = null;
     this.legalMoves = [];

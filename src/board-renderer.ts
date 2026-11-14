@@ -15,6 +15,7 @@ import type {
   Position,
 } from "./domain";
 import { pieceTypeNames } from "./domain";
+import { constants } from "./rules";
 import { textureManifest } from "./textures";
 import { CaptureBoxes, CAPTURE_SCENE_WIDTH } from "./capture-boxes";
 import { RoomAtmospherePass } from "./room-atmosphere-pass";
@@ -202,7 +203,7 @@ export class BoardRenderer {
     this.onPointerUp(event);
 
   constructor(private readonly viewport: HTMLElement, canvas: HTMLCanvasElement) {
-    this.viewSide = window.XiangqiRules.constants.sides.red;
+    this.viewSide = constants.sides.red;
     const woodTextures = createWoodTextures();
     this.woodColorTexture = woodTextures.color;
     this.woodBumpTexture = woodTextures.bump;
@@ -267,7 +268,7 @@ export class BoardRenderer {
     this.captureBoxes = new CaptureBoxes(
       this.scene,
       this.boardSurface.material,
-      window.XiangqiRules.constants.sides,
+      constants.sides,
       group => this.disposeGroup(group),
     );
     this.loadPieceAtlas();
@@ -302,7 +303,7 @@ export class BoardRenderer {
     this.menuMode = active;
     this.controls.enabled = !active && !this.cameraTransition && !this.captureBoxes.isAnimating;
     if (active) {
-      this.setViewForTurn(window.XiangqiRules.constants.sides.red);
+      this.setViewForTurn(constants.sides.red);
     }
   }
 
@@ -377,13 +378,13 @@ export class BoardRenderer {
   }
 
   rotateView(): void {
-    const { red, black } = window.XiangqiRules.constants.sides;
+    const { red, black } = constants.sides;
     this.setViewForTurn((this.pendingViewSide ?? this.viewSide) === red ? black : red);
   }
 
   setViewForTurn(side: number, force = false): void {
-    const red = window.XiangqiRules.constants.sides.red;
-    const targetSide = side === red ? red : window.XiangqiRules.constants.sides.black;
+    const red = constants.sides.red;
+    const targetSide = side === red ? red : constants.sides.black;
     if (this.captureBoxes.isAnimating) {
       this.pendingViewSide = targetSide;
       return;
@@ -399,7 +400,7 @@ export class BoardRenderer {
   // so the board is as large as possible in both portrait and landscape.
   private fixedOffset(side: number): THREE.Vector3 {
     const base = FIXED_VIEW_DIRECTION.clone().multiplyScalar(this.fitDistance());
-    if (side !== window.XiangqiRules.constants.sides.red) base.z = -base.z;
+    if (side !== constants.sides.red) base.z = -base.z;
     return base;
   }
 
@@ -643,7 +644,7 @@ export class BoardRenderer {
     const face = group.children.find(child => child.userData.pieceFace);
     if (!(face instanceof THREE.Mesh)) return;
     const material = face.material as THREE.MeshStandardMaterial;
-    const isRed = piece.side === window.XiangqiRules.constants.sides.red;
+    const isRed = piece.side === constants.sides.red;
     const side = isRed ? "red" : "black";
     const typeName = pieceTypeNames[piece.type] ?? "soldier";
     const key = `${side}-${typeName}`;
@@ -731,11 +732,17 @@ export class BoardRenderer {
   }
 
   private buildStarPoints(): void {
-    const geometry = new THREE.SphereGeometry(0.03, 12, 8);
-    const material = new THREE.MeshStandardMaterial({
-      color: "#56351f",
-      roughness: 0.8,
+    const material = new THREE.MeshBasicMaterial({
+      color: "#000000",
+      toneMapped: false,
+      transparent: true,
+      opacity: 0.55,
     });
+    const gap = 0.08;
+    const arm = 0.17;
+    const thickness = 0.026;
+    const horizontal = new THREE.BoxGeometry(arm, 0.006, thickness);
+    const vertical = new THREE.BoxGeometry(thickness, 0.006, arm);
     const points = [
       [1, 2],
       [7, 2],
@@ -753,15 +760,24 @@ export class BoardRenderer {
       [7, 7],
     ];
     for (const [col, row] of points) {
-      const mark = new THREE.Mesh(geometry, material);
-      mark.position.set(this.worldX(col), BOARD_TOP + 0.024, this.worldZ(row));
-      mark.castShadow = false;
-      this.scene.add(mark);
+      const cx = this.worldX(col);
+      const cz = this.worldZ(row);
+      for (const sx of [-1, 1]) {
+        if ((col === 0 && sx < 0) || (col === 8 && sx > 0)) continue;
+        for (const sz of [-1, 1]) {
+          const h = new THREE.Mesh(horizontal, material);
+          h.position.set(cx + sx * (gap + arm / 2), BOARD_TOP + 0.008, cz + sz * gap);
+          const v = new THREE.Mesh(vertical, material);
+          v.position.set(cx + sx * gap, BOARD_TOP + 0.008, cz + sz * (gap + arm / 2));
+          h.renderOrder = v.renderOrder = 1;
+          this.scene.add(h, v);
+        }
+      }
     }
   }
 
   private createPiece(piece: ChessPiece): THREE.Group {
-    const isRed = piece.side === window.XiangqiRules.constants.sides.red;
+    const isRed = piece.side === constants.sides.red;
     const side = isRed ? "red" : "black";
     const typeName = pieceTypeNames[piece.type] ?? "soldier";
     const group = new THREE.Group();
@@ -1389,7 +1405,7 @@ void main() {
     if (orientationChanged && !this.menuMode) {
       // Switching portrait/landscape glides back to the fixed overview for the new layout.
       this.beginCameraTransition(
-        this.fixedOffset(this.viewSide ?? window.XiangqiRules.constants.sides.red),
+        this.fixedOffset(this.viewSide ?? constants.sides.red),
       );
       return;
     }
