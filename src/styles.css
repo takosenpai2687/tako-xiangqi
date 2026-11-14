@@ -842,6 +842,21 @@ button svg {
   pointer-events: auto;
 }
 
+.hint-level-title {
+  display: flex;
+  min-height: 34px;
+  grid-column: 1 / -1;
+  align-items: center;
+  gap: 8px;
+  margin: -6px -6px 0;
+  padding: 8px 12px;
+  border-radius: 4px 14px 0 0;
+  background: var(--panel);
+  color: var(--accent);
+  font-size: 14px;
+  font-weight: 600;
+}
+
 .hint-levels label {
   position: relative;
   cursor: pointer;

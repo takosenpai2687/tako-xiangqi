@@ -47,7 +47,7 @@ const english = {
   "胜率暂不可用": "Win estimate unavailable",
   "悔棋": "Undo",
   "提示": "Hint",
-  "提示难度": "Hint difficulty",
+  "提示等级": "Hint level",
   "正在计算提示…": "Calculating a hint…",
   "提示计算失败，请重试": "Could not calculate a hint. Please try again.",
   "重开": "Restart",
