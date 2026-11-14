@@ -1,6 +1,6 @@
 # tako-xiangqi
 
-![Xiangqi gameplay](docs/screenshots/game.webp)
+![Xiangqi gameplay](docs/screenshots/game.webp?v=1)
 
 ## English
 
