@@ -4,7 +4,10 @@ import { GameController, type GameState } from "./game-controller";
 import { AiEngine, type AiLevel } from "./ai-engine";
 import { saveQuality, type QualitySettings } from "./quality";
 import { constants } from "./rules";
+import { applyTranslations, language, setLanguage, t, type Message } from "./i18n";
 import "./styles.css";
+
+applyTranslations();
 
 function requireElement<T extends HTMLElement>(id: string): T {
   const element = document.getElementById(id);
@@ -80,7 +83,18 @@ let renderer: BoardRenderer | null = null;
 let game: GameController | null = null;
 let loadingErrors = 0;
 let loadingFinished = false;
+let lastState: GameState | null = null;
+let loadingMessage: Message = "棋局正在展开…";
+let loadingRemaining: number | undefined;
+let currentScreen: "menu" | "local" | "ai" = "menu";
+let winnerSide: "red" | "black" | null = null;
 const loadingStartedAt = performance.now();
+
+function showLoadingMessage(message: Message, count?: number): void {
+  loadingMessage = message;
+  loadingRemaining = count;
+  loadingStatus.textContent = t(message, count);
+}
 
 function setLoadingProgress(progress: number): void {
   const value = Math.max(0, Math.min(100, Math.floor(progress)));
@@ -89,7 +103,7 @@ function setLoadingProgress(progress: number): void {
   loadingPercent.textContent = `${value}%`;
 }
 
-function loadingMessageFor(url: string): string {
+function loadingMessageFor(url: string): Message {
   const asset = url.toLowerCase();
   if (asset.includes("board-walnut")) return "正在打磨棋盘纹理…";
   if (asset.includes("xiangqi-pieces")) return "棋子正在入阵…";
@@ -100,11 +114,11 @@ function loadingMessageFor(url: string): string {
   return "棋局正在展开…";
 }
 
-function finishLoading(message: string): void {
+function finishLoading(message: Message): void {
   if (loadingFinished) return;
   loadingFinished = true;
   setLoadingProgress(100);
-  loadingStatus.textContent = message;
+  showLoadingMessage(message);
 
   const minimumVisibleTime = loadingErrors > 0 ? 1200 : 520;
   const remainingTime = Math.max(
@@ -125,18 +139,19 @@ function finishLoading(message: string): void {
 }
 
 DefaultLoadingManager.onStart = url => {
-  if (!loadingFinished) loadingStatus.textContent = loadingMessageFor(url);
+  if (!loadingFinished) showLoadingMessage(loadingMessageFor(url));
 };
 DefaultLoadingManager.onProgress = (url, loaded, total) => {
   if (loadingFinished) return;
   setLoadingProgress(total > 0 ? (loaded / total) * 100 : 0);
-  loadingStatus.textContent = loadingErrors > 0
-    ? `还有 ${Math.max(total - loaded, 0)} 项棋室素材待完成…`
-    : loadingMessageFor(url);
+  showLoadingMessage(
+    loadingErrors > 0 ? "还有 {count} 项棋室素材待完成…" : loadingMessageFor(url),
+    Math.max(total - loaded, 0),
+  );
 };
 DefaultLoadingManager.onError = () => {
   loadingErrors += 1;
-  loadingStatus.textContent = "有些棋室素材暂时没有载入…";
+  showLoadingMessage("有些棋室素材暂时没有载入…");
 };
 DefaultLoadingManager.onLoad = () => {
   finishLoading(
@@ -145,14 +160,15 @@ DefaultLoadingManager.onLoad = () => {
 };
 
 function describeState(state: GameState): void {
+  lastState = state;
   const redTurn = state.turn === sides.red;
-  turnStatuses.setAttribute("aria-label", redTurn ? "红方行棋" : "黑方行棋");
+  turnStatuses.setAttribute("aria-label", t(redTurn ? "红方行棋" : "黑方行棋"));
   redTurnState.classList.toggle("is-active", state.started && redTurn);
   blackTurnState.classList.toggle("is-active", state.started && !redTurn);
   redPlayer.classList.toggle("is-active", state.started && redTurn);
   blackPlayer.classList.toggle("is-active", state.started && !redTurn);
-  redPlayer.setAttribute("aria-label", redTurn ? "红方行棋" : "红方等待");
-  blackPlayer.setAttribute("aria-label", redTurn ? "黑方等待" : "黑方行棋");
+  redPlayer.setAttribute("aria-label", t(redTurn ? "红方行棋" : "红方等待"));
+  blackPlayer.setAttribute("aria-label", t(redTurn ? "黑方等待" : "黑方行棋"));
   undoButton.disabled = state.moveCount === 0;
   updateRoster("red", state.aliveRed);
   updateRoster("black", state.aliveBlack);
@@ -162,9 +178,9 @@ function describeState(state: GameState): void {
   blackPlayer.style.order = redBottom ? "0" : "1";
   selectionNote.hidden = !state.selected && !state.thinking;
   selectionNote.textContent = state.thinking
-    ? "思考中…"
+    ? t("思考中…")
     : state.selected
-      ? `${state.legalMoveCount} 个合法落点`
+      ? t("{count} 个合法落点", state.legalMoveCount)
       : "";
 }
 
@@ -172,10 +188,11 @@ const TITLES = {
   menu: "tako-xiangqi · 3D 中国象棋",
   local: "本机对战 · tako-xiangqi",
   ai: "人机对战 · tako-xiangqi",
-};
+} as const;
 
 function setScreenTitle(screen: keyof typeof TITLES): void {
-  document.title = TITLES[screen];
+  currentScreen = screen;
+  document.title = t(TITLES[screen]);
   // GTM only sees the title at load; this event lets a trigger send a virtual page view.
   (window as unknown as { dataLayer?: unknown[] }).dataLayer?.push({
     event: "screen_view",
@@ -218,6 +235,12 @@ function syncQualityButtons(): void {
     const value = quality[button.dataset.quality as keyof QualitySettings];
     button.setAttribute("aria-checked", String(Boolean(value)));
     button.dataset.level = String(value);
+    if (button.dataset.quality === "ssao") {
+      const label = t(value === 2 ? "高" : value === 1 ? "低" : "关");
+      const indicator = button.querySelector<HTMLElement>(".level");
+      if (indicator) indicator.dataset.label = label;
+      button.setAttribute("aria-label", `${t("环境光遮蔽")}: ${label}`);
+    }
   }
 }
 async function startAiGame(level: AiLevel): Promise<void> {
@@ -275,7 +298,8 @@ try {
   game = new GameController(renderer, {
     onStateChange: describeState,
     onWinner: winner => {
-      resultTitle.textContent = winner === "red" ? "红方获胜" : "黑方获胜";
+      winnerSide = winner;
+      resultTitle.textContent = t(winner === "red" ? "红方获胜" : "黑方获胜");
       resultEmblem.textContent = winner === "red" ? "帅" : "将";
       resultDialog.dataset.winner = winner;
       resultDialog.showModal();
@@ -315,10 +339,32 @@ try {
   console.error("棋盘初始化失败:", error);
   rendererError.hidden = false;
   rendererError.textContent =
-    "无法启动 3D 棋盘。请使用支持 WebGL 的现代浏览器并重新载入页面。";
+    t("无法启动 3D 棋盘。请使用支持 WebGL 的现代浏览器并重新载入页面。");
   startButton.disabled = true;
   finishLoading("棋盘启动失败");
 }
+
+function refreshLanguage(): void {
+  for (const button of document.querySelectorAll<HTMLButtonElement>("[data-language]")) {
+    button.setAttribute("aria-pressed", String(button.dataset.language === language));
+  }
+  document.title = t(TITLES[currentScreen]);
+  showLoadingMessage(loadingMessage, loadingRemaining);
+  syncQualityButtons();
+  if (lastState) describeState(lastState);
+  if (winnerSide) resultTitle.textContent = t(winnerSide === "red" ? "红方获胜" : "黑方获胜");
+  if (!rendererError.hidden) {
+    rendererError.textContent = t("无法启动 3D 棋盘。请使用支持 WebGL 的现代浏览器并重新载入页面。");
+  }
+}
+
+for (const button of document.querySelectorAll<HTMLButtonElement>("[data-language]")) {
+  button.addEventListener("click", () => {
+    setLanguage(button.dataset.language === "en" ? "en" : "zh");
+    refreshLanguage();
+  });
+}
+refreshLanguage();
 
 if (import.meta.hot) {
   import.meta.hot.dispose(() => renderer?.dispose());

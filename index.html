@@ -62,14 +62,18 @@
 
       <main class="menu-screen" id="menu-screen">
         <section class="menu-panel" aria-label="选择游戏模式">
-          <h1>中国象棋</h1>
+          <h1 data-i18n="中国象棋">中国象棋</h1>
+          <div class="language-picker" role="group" aria-label="Language">
+            <button type="button" data-language="zh" lang="zh-CN" aria-pressed="true">中文</button>
+            <button type="button" data-language="en" lang="en" aria-pressed="false">English</button>
+          </div>
           <div class="mode-list">
             <button class="mode-button mode-local" id="btn-local" type="button">
               <svg viewBox="0 0 24 24" aria-hidden="true">
                 <circle cx="8" cy="7" r="3" />
                 <path d="M2 20v-3a6 6 0 0 1 12 0v3M16 4a3 3 0 0 1 0 6M18 13a5 5 0 0 1 4 5v2" />
               </svg>
-              <span>本机对战</span>
+              <span data-i18n="本机对战">本机对战</span>
               <svg class="mode-arrow" viewBox="0 0 24 24" aria-hidden="true">
                 <path d="M5 12h14m-6-6 6 6-6 6" />
               </svg>
@@ -79,7 +83,7 @@
                 <path d="M12 3v3M5 9h14v11H5zM2 12v5m20-5v5M8 16h8" />
                 <path d="M8 12h1m6 0h1" />
               </svg>
-              <span>人机对战</span>
+              <span data-i18n="人机对战">人机对战</span>
               <svg class="mode-arrow" viewBox="0 0 24 24" aria-hidden="true">
                 <path d="M5 12h14m-6-6 6 6-6 6" />
               </svg>
@@ -88,25 +92,25 @@
               <svg viewBox="0 0 24 24" aria-hidden="true">
                 <path d="M4 7h10m4 0h2M4 17h2m4 0h10M14 4v6m-4 4v6" />
               </svg>
-              <span>画面设置</span>
+              <span data-i18n="画面设置">画面设置</span>
               <svg class="mode-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6" /></svg>
             </button>
           </div>
           <div class="mode-list" id="level-list" hidden>
             <button class="mode-button mode-level" data-level="easy" type="button">
-              <span>简单</span>
+              <span data-i18n="简单">简单</span>
               <svg class="mode-arrow" viewBox="0 0 24 24" aria-hidden="true">
                 <path d="M5 12h14m-6-6 6 6-6 6" />
               </svg>
             </button>
             <button class="mode-button mode-level" data-level="normal" type="button">
-              <span>普通</span>
+              <span data-i18n="普通">普通</span>
               <svg class="mode-arrow" viewBox="0 0 24 24" aria-hidden="true">
                 <path d="M5 12h14m-6-6 6 6-6 6" />
               </svg>
             </button>
             <button class="mode-button mode-level" data-level="hard" type="button">
-              <span>困难</span>
+              <span data-i18n="困难">困难</span>
               <svg class="mode-arrow" viewBox="0 0 24 24" aria-hidden="true">
                 <path d="M5 12h14m-6-6 6 6-6 6" />
               </svg>
@@ -119,19 +123,19 @@
           </div>
           <div class="mode-list" id="settings-list" hidden>
             <button class="mode-button mode-toggle" data-quality="ssao" type="button" role="switch" aria-checked="true">
-              <span>环境光遮蔽</span>
+              <span data-i18n="环境光遮蔽">环境光遮蔽</span>
               <i class="level" aria-hidden="true"><b></b><b></b></i>
             </button>
             <button class="mode-button mode-toggle" data-quality="dof" type="button" role="switch" aria-checked="true">
-              <span>景深</span>
+              <span data-i18n="景深">景深</span>
               <i class="switch" aria-hidden="true"></i>
             </button>
             <button class="mode-button mode-toggle" data-quality="antialias" type="button" role="switch" aria-checked="true">
-              <span>抗锯齿</span>
+              <span data-i18n="抗锯齿">抗锯齿</span>
               <i class="switch" aria-hidden="true"></i>
             </button>
             <button class="mode-button mode-toggle" data-quality="volumetric" type="button" role="switch" aria-checked="true">
-              <span>体积光</span>
+              <span data-i18n="体积光">体积光</span>
               <i class="switch" aria-hidden="true"></i>
             </button>
             <button class="mode-button mode-back" id="btn-settings-back" type="button" aria-label="返回">
@@ -144,13 +148,13 @@
             <div class="engine-loading-bar"><span id="engine-loading-fill"></span></div>
             <strong id="engine-loading-percent">0%</strong>
           </div>
-          <p class="engine-error" id="engine-error" role="alert" hidden>棋手加载失败，请重试</p>
+          <p class="engine-error" id="engine-error" role="alert" data-i18n="棋手加载失败，请重试" hidden>棋手加载失败，请重试</p>
         </section>
         <div class="renderer-error" id="renderer-error" role="alert" hidden></div>
       </main>
 
       <main class="game-screen" id="game-screen" hidden>
-        <h1 class="sr-only">中国象棋 · tako-xiangqi</h1>
+        <h1 class="sr-only" data-i18n="中国象棋 · tako-xiangqi">中国象棋 · tako-xiangqi</h1>
         <div class="hud-home">
           <button
             class="hud-button back-button"
@@ -163,7 +167,7 @@
               <path d="m14 5-7 7 7 7M7 12h13" />
             </svg>
           </button>
-          <span class="hud-mark" aria-hidden="true">中国象棋</span>
+          <span class="hud-mark" aria-hidden="true" data-i18n="中国象棋">中国象棋</span>
         </div>
 
         <div class="hud-turn">
@@ -180,8 +184,8 @@
             </svg>
           </button>
           <div class="turn-statuses" id="turn-statuses" role="status" aria-label="当前回合">
-            <span class="turn-state turn-state-red is-active" id="red-turn-state">红方行棋</span>
-            <span class="turn-state turn-state-black" id="black-turn-state">黑方行棋</span>
+            <span class="turn-state turn-state-red is-active" id="red-turn-state" data-i18n="红方行棋">红方行棋</span>
+            <span class="turn-state turn-state-black" id="black-turn-state" data-i18n="黑方行棋">黑方行棋</span>
           </div>
         </div>
 
@@ -206,7 +210,7 @@
             title="悔棋"
             disabled
           >
-            <span>悔棋</span>
+            <span data-i18n="悔棋">悔棋</span>
           </button>
           <button
             class="hud-button action-button"
@@ -215,7 +219,7 @@
             aria-label="重开"
             title="重开"
           >
-            <span>重开</span>
+            <span data-i18n="重开">重开</span>
           </button>
         </div>
       </main>
@@ -229,7 +233,7 @@
       <span class="result-emblem" id="result-emblem" aria-hidden="true">帅</span>
       <h2 id="result-title">红方获胜</h2>
       <button class="dialog-button" id="btn-rematch" type="button">
-        <span>再来一局</span>
+        <span data-i18n="再来一局">再来一局</span>
         <svg viewBox="0 0 24 24" aria-hidden="true">
           <path d="M5 12h14m-6-6 6 6-6 6" />
         </svg>

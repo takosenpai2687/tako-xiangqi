@@ -1000,13 +1000,36 @@ button svg {
   margin-right: 8px;
   color: var(--muted);
   font-size: 16px;
-  content: "关";
+  content: attr(data-label);
 }
 
-.mode-toggle[data-level="1"] .level::before {
-  content: "低";
+.language-picker {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin: -16px 0 20px;
 }
 
-.mode-toggle[data-level="2"] .level::before {
-  content: "高";
+.language-picker button {
+  padding: 8px 4px;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 15px;
+  cursor: pointer;
+}
+
+.language-picker button[aria-pressed="true"],
+.language-picker button:hover {
+  color: var(--accent);
+}
+
+html[lang="en"] .mode-toggle {
+  gap: 10px;
+  font-size: 17px;
+}
+
+html[lang="en"] .menu-panel h1 {
+  letter-spacing: 0;
 }
