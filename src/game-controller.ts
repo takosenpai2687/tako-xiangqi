@@ -7,8 +7,15 @@ import type {
 } from "./domain";
 import { BoardRenderer } from "./board-renderer";
 import { GameAudio } from "./game-audio";
-import { Chessboard, constants } from "./rules";
-import { toFen, type AiEngine, type AiLevel, type AiMove } from "./ai-engine";
+import { Chessboard, constants, getLegalMoves, getLegalSteps } from "./rules";
+import {
+  redWinRateFromScore,
+  toFen,
+  type AiEngine,
+  type AiLevel,
+  type AiScore,
+  type AiSearchResult,
+} from "./ai-engine";
 
 interface PieceSnapshot {
   piece: ChessPiece;
@@ -35,6 +42,9 @@ export interface GameState {
   hintThinking: boolean;
   hintError: boolean;
   hintLevel: AiLevel;
+  winRateRed: number | null;
+  evaluating: boolean;
+  winRateError: boolean;
 }
 
 const TEA_SOUNDS = { lift: "cupLift", sip: "teaSip", place: "cupPlace" } as const;
@@ -65,18 +75,24 @@ export class GameController {
   private readonly view: GameView;
   private readonly audio = new GameAudio();
   private ai: { engine: AiEngine; level: AiLevel; humanSide: number } | null = null;
-  private aiSearch: Promise<AiMove | null> | null = null;
+  private aiSearch: Promise<AiSearchResult | null> | null = null;
   private aiToken = 0;
+  private evaluationToken = 0;
   private thinking = false;
   private hintToken = 0;
   private hintThinking = false;
   private hintError = false;
   private hintLevel: AiLevel = "normal";
+  private winRateRed: number | null = null;
+  private evaluating = false;
+  private winRateError = false;
 
   setAi(ai: { engine: AiEngine; level: AiLevel; humanSide: number } | null): void {
     this.ai = ai;
     this.cancelAi();
     this.hintLevel = ai?.level === "easy" ? "normal" : "hard";
+    this.winRateRed = null;
+    this.winRateError = false;
   }
 
   setHintLevel(level: AiLevel): void {
@@ -98,9 +114,13 @@ export class GameController {
     this.hintThinking = true;
     this.notify();
     try {
-      const move = await this.searchMove(this.ai.engine, this.hintLevel, () => token === this.hintToken);
+      const result = await this.searchPosition(
+        this.ai.engine,
+        this.hintLevel,
+        () => token === this.hintToken,
+      );
       if (token !== this.hintToken) return;
-      const picked = this.resolveAiMove(move, this.turn);
+      const picked = this.resolveAiMove(result?.move ?? null, this.turn);
       if (!picked) throw new Error("The hint engine returned no legal move.");
       this.clearHint();
       this.selectPiece(picked.piece);
@@ -137,6 +157,7 @@ export class GameController {
     this.renderer.setViewForTurn(this.viewTurn(), true);
     this.render();
     this.queueAiMove();
+    if (this.ai && this.turn === this.ai.humanSide) void this.evaluateWinRate();
   }
 
   // Locked views: local play snaps to the side to move; against the AI only the
@@ -170,8 +191,11 @@ export class GameController {
     this.legalMoves = [];
     this.lastMove = null;
     this.winner = null;
+    this.winRateRed = null;
+    this.winRateError = false;
     if (!this.ai) this.renderer.setViewForTurn(this.turn, true);
     this.render();
+    if (this.ai && this.turn === this.ai.humanSide) void this.evaluateWinRate();
     this.queueAiMove();
   }
 
@@ -185,6 +209,9 @@ export class GameController {
     this.winner = null;
     this.moveCount = 0;
     this.lastMove = null;
+    this.winRateRed = null;
+    this.evaluating = false;
+    this.winRateError = false;
     this.history = [this.snapshot()];
     this.render();
   }
@@ -234,7 +261,7 @@ export class GameController {
     if (piece !== this.selected) this.clearHint();
     this.audio.play("pickup");
     this.selected = piece;
-    this.legalMoves = piece.getNextSteps(this.board.state);
+    this.legalMoves = getLegalSteps(piece, this.board.state);
     this.render();
   }
 
@@ -244,7 +271,7 @@ export class GameController {
     );
   }
 
-  private movePiece(position: Position): void {
+  private movePiece(position: Position, score?: AiScore | null): void {
     if (!this.selected) return;
     this.clearHint();
     const piece = this.selected;
@@ -263,6 +290,13 @@ export class GameController {
     };
     this.history.push(this.snapshot());
     this.checkWinner();
+    if (this.ai && !this.winner) {
+      if (piece.side === this.aiSide && score) {
+        this.setWinRate(score, this.aiSide);
+      } else {
+        void this.evaluateWinRate();
+      }
+    }
     this.renderer.sync(this.board.state, null, [], this.lastMove, this.getTurnPieces());
     if (captured) {
       this.audio.playMoveAndCapture(
@@ -284,11 +318,18 @@ export class GameController {
 
   private cancelAi(): void {
     this.aiToken++;
+    this.evaluationToken++;
+    this.evaluating = false;
     this.thinking = false;
     this.clearHint();
   }
 
-  private searchMove(engine: AiEngine, level: AiLevel, isCurrent: () => boolean): Promise<AiMove | null> {
+  private searchPosition(
+    engine: AiEngine,
+    level: AiLevel,
+    isCurrent: () => boolean,
+    analysis = false,
+  ): Promise<AiSearchResult | null> {
     const previous = this.aiSearch;
     // Opponent and hint searches share one worker and must never overlap.
     this.aiSearch = (async () => {
@@ -299,12 +340,38 @@ export class GameController {
         this.turn === this.rules.sides.red ? "red" : "black",
         this.rules.sides.red,
       );
-      return engine.search(fen, level);
+      return analysis ? engine.analyze(fen) : engine.search(fen, level);
     })().catch(error => {
       console.warn("AI search failed:", error);
       return null;
     });
     return this.aiSearch;
+  }
+
+  private async evaluateWinRate(): Promise<void> {
+    if (!this.ai || !this.started || this.winner) return;
+    const token = ++this.evaluationToken;
+    const { engine, level } = this.ai;
+    this.evaluating = true;
+    this.winRateRed = null;
+    this.winRateError = false;
+    this.notify();
+    const result = await this.searchPosition(engine, level, () => token === this.evaluationToken, true);
+    if (token !== this.evaluationToken) return;
+    this.evaluating = false;
+    if (result?.score) this.setWinRate(result.score, this.turn);
+    else {
+      this.winRateError = true;
+    }
+    this.notify();
+  }
+
+  private setWinRate(score: AiScore, scoreSide: number | null): void {
+    if (scoreSide === null) return;
+    this.evaluationToken++;
+    this.evaluating = false;
+    this.winRateError = false;
+    this.winRateRed = redWinRateFromScore(score, scoreSide, this.rules.sides.red);
   }
 
   private queueAiMove(): void {
@@ -315,17 +382,15 @@ export class GameController {
     this.notify();
     void (async () => {
       const startedAt = performance.now();
-      let move = this.findGeneralCapture();
-      if (!move) {
-        move = await this.searchMove(engine, level, () => token === this.aiToken);
-      }
+      const result = await this.searchPosition(engine, level, () => token === this.aiToken);
       // A little pause so the reply never feels instantaneous.
       const wait = Math.max(0, 500 - (performance.now() - startedAt));
       await new Promise(resolve => window.setTimeout(resolve, wait));
       if (token !== this.aiToken) return;
-      const picked = this.resolveAiMove(move) ?? this.randomAiMove();
+      const picked = this.resolveAiMove(result?.move ?? null) ?? this.randomAiMove();
       if (!picked) {
         this.thinking = false;
+        this.checkWinner();
         this.notify();
         return;
       }
@@ -333,14 +398,8 @@ export class GameController {
       await new Promise(resolve => window.setTimeout(resolve, 450));
       if (token !== this.aiToken) return;
       this.thinking = false;
-      this.movePiece(picked.to);
+      this.movePiece(picked.to, result?.score);
     })();
-  }
-
-  private aiPieces(): ChessPiece[] {
-    return this.board.state.flat().filter(
-      (piece): piece is ChessPiece => piece !== null && piece.side === this.aiSide,
-    );
   }
 
   private resolveAiMove(
@@ -350,28 +409,14 @@ export class GameController {
     if (!move) return null;
     const piece = this.board.state[move.from.row]?.[move.from.col];
     if (!piece || piece.side !== side) return null;
-    const legal = piece.getNextSteps(this.board.state).some(
+    const legal = getLegalSteps(piece, this.board.state).some(
       step => step.row === move.to.row && step.col === move.to.col,
     );
     return legal ? { piece, to: move.to } : null;
   }
 
-  // The rules module is pseudo-legal (no check detection), so always take a capturable general.
-  private findGeneralCapture(): { from: Position; to: Position } | null {
-    for (const piece of this.aiPieces()) {
-      for (const step of piece.getNextSteps(this.board.state)) {
-        if (this.board.state[step.row][step.col]?.type === this.rules.types.general) {
-          return { from: { row: piece.row, col: piece.col }, to: step };
-        }
-      }
-    }
-    return null;
-  }
-
   private randomAiMove(): { piece: ChessPiece; to: Position } | null {
-    const options = this.aiPieces().flatMap(piece =>
-      piece.getNextSteps(this.board.state).map(to => ({ piece, to })),
-    );
+    const options = getLegalMoves(this.board.state, this.aiSide ?? -1);
     return options.length ? options[Math.floor(Math.random() * options.length)] : null;
   }
 
@@ -379,8 +424,15 @@ export class GameController {
     const generals = this.board.state.flat().filter(
       piece => piece?.type === this.rules.types.general,
     );
-    if (generals.length === 2) return;
-    this.winner = generals[0]?.side === this.rules.sides.red ? "red" : "black";
+    if (generals.length === 2 && getLegalMoves(this.board.state, this.turn).length > 0) return;
+    const winnerSide = generals.length < 2
+      ? generals[0]?.side ?? 1 - this.turn
+      : 1 - this.turn;
+    this.winner = winnerSide === this.rules.sides.red ? "red" : "black";
+    this.evaluationToken++;
+    this.evaluating = false;
+    this.winRateError = false;
+    this.winRateRed = this.winner === "red" ? 100 : 0;
     this.view.onWinner(this.winner);
   }
 
@@ -452,6 +504,9 @@ export class GameController {
       hintThinking: this.hintThinking,
       hintError: this.hintError,
       hintLevel: this.hintLevel,
+      winRateRed: this.winRateRed,
+      evaluating: this.evaluating,
+      winRateError: this.winRateError,
     });
   }
 }

@@ -8,6 +8,16 @@ export interface AiMove {
   to: Position;
 }
 
+export interface AiScore {
+  type: "cp" | "mate";
+  value: number;
+}
+
+export interface AiSearchResult {
+  move: AiMove | null;
+  score: AiScore | null;
+}
+
 // Kept deliberately light so phones stay responsive: shallow depth plus a hard time cap.
 const LEVELS: Record<AiLevel, { options: Record<string, string | number>; go: string }> = {
   easy: {
@@ -59,18 +69,25 @@ export function parseMove(text: string): AiMove | null {
   };
 }
 
+export function redWinRateFromScore(score: AiScore, scoreSide: number, redSide: number): number {
+  const scoreSideWinRate = score.type === "mate"
+    ? score.value > 0 ? 99 : 1
+    : 100 / (1 + Math.exp(-Math.max(-1600, Math.min(1600, score.value)) / 400));
+  return Math.round(scoreSide === redSide ? scoreSideWinRate : 100 - scoreSideWinRate);
+}
+
 // Runs Pikafish (WASM) inside a worker; the ~50 MB engine is only fetched on first use.
 export class AiEngine {
   private worker: Worker | null = null;
   private ready: Promise<void> | null = null;
   private searchId = 0;
-  private waiting = new Map<number, (move: string | null) => void>();
+  private waiting = new Map<number, (result: AiSearchResult | null) => void>();
 
   load(onProgress?: (fraction: number) => void): Promise<void> {
     if (this.ready) return this.ready;
     this.ready = new Promise<void>((resolve, reject) => {
       // Version the worker entry: older deployments marked /engine/* immutable.
-      const worker = new Worker(`${import.meta.env.BASE_URL}engine/pikafish-worker.js?v=2`);
+      const worker = new Worker(`${import.meta.env.BASE_URL}engine/pikafish-worker.js?v=3`);
       this.worker = worker;
       worker.onmessage = event => {
         const data = event.data;
@@ -78,7 +95,14 @@ export class AiEngine {
         else if (data.type === "ready") resolve();
         else if (data.type === "error") reject(new Error(data.message));
         else if (data.type === "bestmove") {
-          this.waiting.get(data.id)?.(data.move);
+          const score = data.score;
+          this.waiting.get(data.id)?.({
+            move: typeof data.move === "string" ? parseMove(data.move) : null,
+            score: score && (score.type === "cp" || score.type === "mate")
+              && Number.isFinite(score.value)
+              ? score
+              : null,
+          });
           this.waiting.delete(data.id);
         }
       };
@@ -93,16 +117,28 @@ export class AiEngine {
     return this.ready;
   }
 
-  async search(fen: string, level: AiLevel): Promise<AiMove | null> {
+  search(fen: string, level: AiLevel): Promise<AiSearchResult | null> {
+    return this.run(fen, LEVELS[level].go, LEVELS[level].options);
+  }
+
+  analyze(fen: string, moveTimeMs = 160): Promise<AiSearchResult | null> {
+    const time = Math.max(50, Math.min(300, Math.floor(moveTimeMs)));
+    return this.run(fen, `go movetime ${time}`);
+  }
+
+  private async run(
+    fen: string,
+    go: string,
+    options: Record<string, string | number> = {},
+  ): Promise<AiSearchResult | null> {
     await this.ready;
     const worker = this.worker;
     if (!worker) return null;
     const id = ++this.searchId;
-    const text = await new Promise<string | null>(resolve => {
+    return new Promise<AiSearchResult | null>(resolve => {
       this.waiting.set(id, resolve);
-      worker.postMessage({ type: "search", id, fen, ...LEVELS[level] });
+      worker.postMessage({ type: "search", id, fen, options, go });
     });
-    return text ? parseMove(text) : null;
   }
 
   dispose(): void {

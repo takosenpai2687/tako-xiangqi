@@ -1,7 +1,7 @@
 // Classic worker hosting the Pikafish WASM engine (pthreads + SIMD, one search thread).
 // Protocol: main -> {type:"init"} | {type:"search", id, fen, options, go}
 //           worker -> {type:"progress", value} | {type:"ready"} | {type:"error", message}
-//                     | {type:"bestmove", id, move}
+//                     | {type:"bestmove", id, move, score}
 // Emscripten spawns its pthread workers from document.currentScript.src, which does not exist
 // inside a worker; point it at the engine script so the pool workers load pikafish.js.
 globalThis.document = { currentScript: { src: new URL("pikafish.js", self.location.href).href } };
@@ -11,11 +11,22 @@ let engine = null;
 let pending = null;
 
 function handleLine(line) {
-  if (pending && line.startsWith("bestmove")) {
+  if (!pending) return;
+  if (line.startsWith("info")) {
+    const match = /\bscore (cp|mate) (-?\d+)(?:\s+(lowerbound|upperbound))?\b/.exec(line);
+    if (match && !match[3]) {
+      pending.score = { type: match[1], value: Number(match[2]) };
+    }
+  } else if (line.startsWith("bestmove")) {
     const move = line.split(/\s+/)[1];
-    const { id } = pending;
+    const { id, score } = pending;
     pending = null;
-    self.postMessage({ type: "bestmove", id, move: move && move !== "(none)" ? move : null });
+    self.postMessage({
+      type: "bestmove",
+      id,
+      move: move && move !== "(none)" ? move : null,
+      score: score || null,
+    });
   }
 }
 

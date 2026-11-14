@@ -32,6 +32,9 @@ const blackTurnState = requireElement<HTMLElement>("black-turn-state");
 const selectionNote = requireElement<HTMLElement>("selection-note");
 const redPlayer = requireElement<HTMLElement>("red-player");
 const blackPlayer = requireElement<HTMLElement>("black-player");
+const winEstimates = requireElement<HTMLElement>("win-estimates");
+const redWinRate = requireElement<HTMLElement>("red-win-rate");
+const blackWinRate = requireElement<HTMLElement>("black-win-rate");
 const undoButton = requireElement<HTMLButtonElement>("btn-undo");
 const hintControls = requireElement<HTMLElement>("hint-controls");
 const hintButton = requireElement<HTMLButtonElement>("btn-hint");
@@ -182,6 +185,20 @@ function describeState(state: GameState): void {
   redPlayer.setAttribute("aria-label", t(redTurn ? "红方行棋" : "红方等待"));
   blackPlayer.setAttribute("aria-label", t(redTurn ? "黑方等待" : "黑方行棋"));
   undoButton.disabled = !state.canUndo;
+  winEstimates.hidden = state.humanSide === null;
+  const redRateText = state.winRateRed === null
+    ? state.winRateError ? "—" : state.evaluating ? "…" : "—"
+    : `${state.winRateRed}%`;
+  const blackRateText = state.winRateRed === null
+    ? redRateText
+    : `${100 - state.winRateRed}%`;
+  redWinRate.textContent = redRateText;
+  blackWinRate.textContent = blackRateText;
+  redWinRate.setAttribute("aria-label", `${t("红方胜率估计")}：${redRateText}`);
+  blackWinRate.setAttribute("aria-label", `${t("黑方胜率估计")}：${blackRateText}`);
+  winEstimates.setAttribute("aria-label", t(
+    state.winRateError ? "胜率暂不可用" : state.evaluating ? "胜率计算中" : "胜率估计",
+  ));
   hintControls.hidden = state.humanSide === null;
   hintButton.disabled = !state.canHint;
   hintButton.setAttribute("aria-busy", String(state.hintThinking));
@@ -196,6 +213,8 @@ function describeState(state: GameState): void {
   const redBottom = state.humanSide === null ? redTurn : state.humanSide === sides.red;
   redPlayer.style.order = redBottom ? "1" : "0";
   blackPlayer.style.order = redBottom ? "0" : "1";
+  redWinRate.style.order = redPlayer.style.order;
+  blackWinRate.style.order = blackPlayer.style.order;
   selectionNote.hidden = !state.selected && !state.thinking && !state.hintThinking;
   selectionNote.textContent = state.hintThinking
     ? t("正在计算提示…")

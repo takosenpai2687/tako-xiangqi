@@ -24,6 +24,71 @@ const ROWS = 10;
 const COLS = 9;
 const ORTHOGONAL = [[-1, 0], [1, 0], [0, -1], [0, 1]] as const;
 
+export function isInCheck(state: State, side: number): boolean {
+  const general = state.flat().find(
+    piece => piece?.side === side && piece.type === constants.types.general,
+  );
+  if (!general) return true;
+
+  const enemy = side === constants.sides.red ? constants.sides.black : constants.sides.red;
+  const enemyGeneral = state.flat().find(
+    piece => piece?.side === enemy && piece.type === constants.types.general,
+  );
+  if (enemyGeneral?.col === general.col) {
+    const [top, bottom] = [Math.min(enemyGeneral.row, general.row), Math.max(enemyGeneral.row, general.row)];
+    let blocked = false;
+    for (let row = top + 1; row < bottom; row++) {
+      if (state[row][general.col]) {
+        blocked = true;
+        break;
+      }
+    }
+    if (!blocked) return true;
+  }
+
+  return state.flat().some(piece =>
+    piece?.side === enemy
+      && piece.getNextSteps(state).some(step => step.row === general.row && step.col === general.col),
+  );
+}
+
+export function getLegalSteps(piece: ChessPiece, state: State): Position[] {
+  if (!state.flat().some(
+    candidate => candidate?.side === piece.side && candidate.type === constants.types.general,
+  )) return [];
+
+  const legal: Position[] = [];
+  for (const step of piece.getNextSteps(state)) {
+    const nextState = state.map(row => row.slice());
+    const fromRow = piece.row;
+    const fromCol = piece.col;
+    const captured = nextState[step.row][step.col];
+    nextState[fromRow][fromCol] = null;
+    nextState[step.row][step.col] = piece;
+    piece.row = step.row;
+    piece.col = step.col;
+    let safe = false;
+    try {
+      safe = !isInCheck(nextState, piece.side);
+    } finally {
+      piece.row = fromRow;
+      piece.col = fromCol;
+      nextState[fromRow][fromCol] = piece;
+      nextState[step.row][step.col] = captured;
+    }
+    if (safe) legal.push(step);
+  }
+  return legal;
+}
+
+export function getLegalMoves(state: State, side: number): Array<{ piece: ChessPiece; to: Position }> {
+  return state.flat().flatMap(piece =>
+    piece?.side === side
+      ? getLegalSteps(piece, state).map(to => ({ piece, to }))
+      : [],
+  );
+}
+
 const START_POSITIONS = {
   red: {
     general: [[9, 4]],

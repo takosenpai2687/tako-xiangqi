@@ -652,9 +652,46 @@ button svg {
 
 .hud-players {
   bottom: calc(max(var(--hud-inset), env(safe-area-inset-bottom)) + 66px);
+  align-items: center;
+  gap: 10px;
+}
+
+.player-rosters {
+  display: flex;
   align-items: flex-end;
   flex-direction: column;
   gap: 10px;
+}
+
+.win-estimates {
+  display: flex;
+  min-width: 42px;
+  align-items: flex-end;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.win-estimates[hidden] {
+  display: none;
+}
+
+.win-estimate {
+  display: grid;
+  min-height: 34px;
+  place-items: center end;
+  color: rgb(239 232 218 / 78%);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  transition: color 220ms ease;
+}
+
+.win-estimate-red {
+  color: #e3a18d;
+}
+
+.win-estimate-black {
+  color: #decc9c;
 }
 
 .roster {
@@ -1026,6 +1063,20 @@ button svg {
     gap: 7px;
   }
 
+  .hud-players {
+    gap: 7px;
+  }
+
+  .win-estimates,
+  .player-rosters {
+    gap: 8px;
+  }
+
+  .win-estimate {
+    min-height: 28px;
+    font-size: 12px;
+  }
+
   .player-marker {
     flex-basis: 9px;
     width: 9px;
@@ -1045,6 +1096,21 @@ button svg {
 
   .back-button {
     width: 44px;
+  }
+}
+
+@media (max-width: 360px) {
+  .player-chip {
+    gap: 0;
+  }
+
+  .player-marker {
+    display: none;
+  }
+
+  .roster-piece {
+    width: 26px;
+    height: 26px;
   }
 }
 

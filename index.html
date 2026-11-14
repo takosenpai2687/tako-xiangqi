@@ -214,14 +214,20 @@
         <div class="sr-only" id="selection-note" aria-live="polite" hidden></div>
 
         <div class="hud-players" aria-label="棋手">
-          <span class="player-chip" id="red-player">
-            <span class="player-marker" aria-hidden="true"></span>
-            <span class="roster" id="red-roster"></span>
-          </span>
-          <span class="player-chip" id="black-player">
-            <span class="player-marker" aria-hidden="true"></span>
-            <span class="roster" id="black-roster"></span>
-          </span>
+          <div class="win-estimates" id="win-estimates" role="group" aria-label="胜率估计" aria-live="polite" hidden>
+            <span class="win-estimate win-estimate-red" id="red-win-rate" aria-label="红方胜率估计">—</span>
+            <span class="win-estimate win-estimate-black" id="black-win-rate" aria-label="黑方胜率估计">—</span>
+          </div>
+          <div class="player-rosters">
+            <span class="player-chip" id="red-player">
+              <span class="player-marker" aria-hidden="true"></span>
+              <span class="roster" id="red-roster"></span>
+            </span>
+            <span class="player-chip" id="black-player">
+              <span class="player-marker" aria-hidden="true"></span>
+              <span class="roster" id="black-roster"></span>
+            </span>
+          </div>
         </div>
         <div class="hud-actions">
           <div class="hint-controls" id="hint-controls" hidden>
