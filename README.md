@@ -1,6 +1,6 @@
 # tako-xiangqi
 
-## [Play now · 立即游玩](https://tako-xiangqi.netlify.app)
+## 🍵 [Play now · 立即游玩](https://tako-xiangqi.netlify.app)
 
 ![Xiangqi gameplay](docs/screenshots/game-screenshot.webp)
 
