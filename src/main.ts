@@ -216,7 +216,7 @@ try {
   requireElement<HTMLButtonElement>("btn-rematch").addEventListener("click", restartGame);
   requireElement<HTMLButtonElement>("btn-menu").addEventListener("click", showMenu);
   requireElement<HTMLButtonElement>("btn-view").addEventListener("click", () => {
-    renderer?.rotateView();
+    game?.resetView();
   });
 } catch (error) {
   console.error("棋盘初始化失败:", error);

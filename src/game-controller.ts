@@ -68,8 +68,15 @@ export class GameController {
   start(): void {
     if (this.started) return;
     this.started = true;
-    this.renderer.setViewForTurn(this.viewTurn());
+    this.renderer.setViewForTurn(this.viewTurn(), true);
     this.render();
+  }
+
+  // Locked views: local play snaps to the side to move; against the AI only the
+  // player's side is ever locked, so the button returns to it instead of flipping.
+  resetView(): void {
+    if (this.ai) this.renderer.setViewForTurn(this.rules.sides.red, true);
+    else this.renderer.rotateView();
   }
 
   undo(): void {
@@ -88,7 +95,7 @@ export class GameController {
     this.legalMoves = [];
     this.lastMove = null;
     this.winner = null;
-    this.renderer.setViewForTurn(this.viewTurn());
+    if (!this.ai) this.renderer.setViewForTurn(this.turn, true);
     this.render();
     this.queueAiMove();
   }
@@ -182,12 +189,12 @@ export class GameController {
         piece.side === this.rules.sides.red ? "redMove" : "blackMove",
       );
     }
-    this.renderer.setViewForTurn(this.viewTurn());
+    if (!this.ai) this.renderer.setViewForTurn(this.turn, true);
     this.notify();
     this.queueAiMove();
   }
 
-  // Against the AI the camera stays on the player's (red) side.
+  // Against the AI the initial camera is the player's (red) side.
   private viewTurn(): number {
     return this.ai ? this.rules.sides.red : this.turn;
   }

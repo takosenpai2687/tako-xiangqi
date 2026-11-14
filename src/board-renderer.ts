@@ -20,6 +20,14 @@ import { RoomAtmospherePass } from "./room-atmosphere-pass";
 import { ChessRoom } from "./chess-room";
 
 const BOARD_WIDTH = 8;
+// Fixed overview framing: the wooden board body (9.55 x 10.55) plus piece height,
+// kept inside this fraction of the viewport (NDC) so the board fills the screen.
+const FIXED_FIT_HALF_WIDTH = 4.78;
+const FIXED_FIT_HALF_DEPTH = 5.28;
+const FIXED_FIT_TOP = 0.9;
+const FIXED_FIT_MARGIN = 0.96;
+// Camera direction of the fixed overview (red side); steeper means closer to top-down.
+const FIXED_VIEW_DIRECTION = new THREE.Vector3(0, 13, 8.2).normalize();
 const BOARD_DEPTH = 9;
 const BOARD_TOP = 0.53;
 const PIECE_RADIUS = 0.39;
@@ -223,7 +231,7 @@ export class BoardRenderer {
     this.ssaoPass.copyMaterial.blendDst = THREE.OneMinusSrcAlphaFactor;
     this.composer.addPass(this.ssaoPass);
 
-    this.camera.position.set(0, 10.5, 11.2);
+    this.camera.position.set(0, 13, 8.2);
     this.camera.lookAt(0, BOARD_TOP, 0);
 
     this.controls = new OrbitControls(this.camera, canvas);
@@ -232,6 +240,9 @@ export class BoardRenderer {
     this.controls.dampingFactor = 0.075;
     this.controls.enabled = false;
     this.controls.enablePan = false;
+    // Zoom (wheel / pinch) always dollies toward the board center, never the cursor or fingers.
+    this.controls.zoomToCursor = false;
+    this.controls.touches = { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_ROTATE };
     this.controls.minDistance = 9;
     this.controls.maxDistance = 48;
     this.controls.minPolarAngle = Math.PI * 0.12;
@@ -357,29 +368,55 @@ export class BoardRenderer {
     this.setViewForTurn((this.pendingViewSide ?? this.viewSide) === red ? black : red);
   }
 
-  setViewForTurn(side: number): void {
+  setViewForTurn(side: number, force = false): void {
     const red = window.XiangqiRules.constants.sides.red;
     const targetSide = side === red ? red : window.XiangqiRules.constants.sides.black;
     if (this.captureBoxes.isAnimating) {
       this.pendingViewSide = targetSide;
       return;
     }
-    if (this.viewSide === targetSide) return;
+    // `force` re-snaps to the fixed camera even when the user has dragged away from it.
+    if (this.viewSide === targetSide && !force) return;
     this.viewSide = targetSide;
     this.beginCameraTransition(this.fixedOffset(targetSide));
   }
 
-  // Fixed oblique overview for each side; distance grows on narrow (portrait) screens
-  // so the whole board always fits.
+  // Fixed oblique overview for each side. The distance is solved from the real projection:
+  // the closest camera position that keeps the whole board (plus margin) inside the viewport,
+  // so the board is as large as possible in both portrait and landscape.
   private fixedOffset(side: number): THREE.Vector3 {
-    const base = new THREE.Vector3(0, 10.5, 11.2);
-    const fit =
-      CAPTURE_SCENE_WIDTH /
-      (2 * Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2)) * this.camera.aspect);
-    const scale = Math.max(1, fit / base.length());
-    base.multiplyScalar(scale);
+    const base = FIXED_VIEW_DIRECTION.clone().multiplyScalar(this.fitDistance());
     if (side !== window.XiangqiRules.constants.sides.red) base.z = -base.z;
     return base;
+  }
+
+  private fitDistance(): number {
+    const probe = new THREE.PerspectiveCamera(this.camera.fov, this.camera.aspect, 0.1, 200);
+    const target = new THREE.Vector3(0, BOARD_TOP, 0);
+    const corners: THREE.Vector3[] = [];
+    for (const x of [-FIXED_FIT_HALF_WIDTH, FIXED_FIT_HALF_WIDTH]) {
+      for (const z of [-FIXED_FIT_HALF_DEPTH, FIXED_FIT_HALF_DEPTH]) {
+        for (const y of [0, FIXED_FIT_TOP]) corners.push(new THREE.Vector3(x, BOARD_TOP + y, z));
+      }
+    }
+    const fits = (distance: number): boolean => {
+      probe.position.copy(target).addScaledVector(FIXED_VIEW_DIRECTION, distance);
+      probe.lookAt(target);
+      probe.updateMatrixWorld(true);
+      probe.updateProjectionMatrix();
+      return corners.every(corner => {
+        const ndc = corner.clone().project(probe);
+        return Math.abs(ndc.x) <= FIXED_FIT_MARGIN && Math.abs(ndc.y) <= FIXED_FIT_MARGIN;
+      });
+    };
+    let near = 4;
+    let far = 120;
+    for (let i = 0; i < 24; i++) {
+      const mid = (near + far) / 2;
+      if (fits(mid)) far = mid;
+      else near = mid;
+    }
+    return far;
   }
 
   dispose(): void {
@@ -1000,11 +1037,15 @@ void main() {
     if (this.pendingViewSide !== null && !this.captureBoxes.isAnimating) {
       const side = this.pendingViewSide;
       this.pendingViewSide = null;
-      this.setViewForTurn(side);
+      this.setViewForTurn(side, true);
     }
     this.updateCamera(elapsed);
     this.updateSelection(elapsed);
-    if (!this.cameraTransition && !this.captureBoxes.isAnimating) this.controls.update();
+    if (!this.cameraTransition && !this.captureBoxes.isAnimating) {
+      // Keep the orbit target pinned to the board center so zooming can never drift off it.
+      this.controls.target.set(0, BOARD_TOP, 0);
+      this.controls.update();
+    }
     this.updateMenuCamera(elapsed);
     this.captureBoxes.faceView(Math.atan2(
       this.camera.position.x - this.controls.target.x,
@@ -1265,20 +1306,17 @@ void main() {
     this.camera.aspect = width / height;
     this.camera.updateProjectionMatrix();
     this.composer.setSize(width, height);
-    const frameWidth = CAPTURE_SCENE_WIDTH;
-    const minDistance =
-      frameWidth /
-      (2 * Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2)) * this.camera.aspect);
-    this.controls.maxDistance = Math.max(48, minDistance * 1.35);
+    const fit = this.fitDistance();
+    const minDistance = fit * 0.6;
+    this.controls.maxDistance = Math.max(48, fit * 1.6);
     const portrait = this.camera.aspect < 1;
     const orientationChanged = portrait !== this.wasPortrait;
     this.wasPortrait = portrait;
-    if (orientationChanged && !this.menuMode && !this.cameraTransition) {
-      // Rotating the device re-frames the fixed overview instead of keeping a stale distance.
-      this.camera.position
-        .copy(this.controls.target)
-        .add(this.fixedOffset(this.viewSide ?? window.XiangqiRules.constants.sides.red));
-      this.camera.lookAt(this.controls.target);
+    if (orientationChanged && !this.menuMode) {
+      // Switching portrait/landscape glides back to the fixed overview for the new layout.
+      this.beginCameraTransition(
+        this.fixedOffset(this.viewSide ?? window.XiangqiRules.constants.sides.red),
+      );
       return;
     }
     const offset = this.camera.position.clone().sub(this.controls.target);
