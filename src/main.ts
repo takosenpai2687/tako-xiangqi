@@ -153,6 +153,10 @@ function describeState(state: GameState): void {
   undoButton.disabled = state.moveCount === 0;
   updateRoster("red", state.aliveRed);
   updateRoster("black", state.aliveBlack);
+  // The seat at the bottom of the screen is the side to move; against the AI it is always the human (red).
+  const redBottom = state.vsAi || redTurn;
+  redPlayer.style.order = redBottom ? "1" : "0";
+  blackPlayer.style.order = redBottom ? "0" : "1";
   selectionNote.hidden = !state.selected && !state.thinking;
   selectionNote.textContent = state.thinking
     ? "思考中…"

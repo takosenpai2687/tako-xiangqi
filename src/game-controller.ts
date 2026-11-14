@@ -28,6 +28,7 @@ export interface GameState {
   aliveBlack: number[];
   lastMove: MoveRecord | null;
   thinking: boolean;
+  vsAi: boolean;
 }
 
 const TEA_SOUNDS = { lift: "cupLift", sip: "teaSip", place: "cupPlace" } as const;
@@ -354,6 +355,7 @@ export class GameController {
       aliveBlack: countByType(blackPieces),
       lastMove: this.lastMove,
       thinking: this.thinking,
+      vsAi: this.ai !== null,
     });
   }
 }
