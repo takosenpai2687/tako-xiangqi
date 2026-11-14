@@ -1,6 +1,7 @@
 import { DefaultLoadingManager } from "three";
 import { BoardRenderer } from "./board-renderer";
 import { GameController, type GameState } from "./game-controller";
+import { AiEngine, type AiLevel } from "./ai-engine";
 import "./styles.css";
 
 function requireElement<T extends HTMLElement>(id: string): T {
@@ -30,6 +31,12 @@ const resultDialog = requireElement<HTMLDialogElement>("result-dialog");
 const resultTitle = requireElement<HTMLElement>("result-title");
 const resultEmblem = requireElement<HTMLElement>("result-emblem");
 const startButton = requireElement<HTMLButtonElement>("btn-local");
+const modeList = requireElement<HTMLElement>("btn-local").parentElement as HTMLElement;
+const levelList = requireElement<HTMLElement>("level-list");
+const engineLoading = requireElement<HTMLElement>("engine-loading");
+const engineLoadingFill = requireElement<HTMLElement>("engine-loading-fill");
+const engineLoadingPercent = requireElement<HTMLElement>("engine-loading-percent");
+const engineError = requireElement<HTMLElement>("engine-error");
 const sides = window.XiangqiRules.constants.sides;
 
 let renderer: BoardRenderer | null = null;
@@ -110,22 +117,65 @@ function describeState(state: GameState): void {
   redPlayer.setAttribute("aria-label", redTurn ? "红方行棋" : "红方等待");
   blackPlayer.setAttribute("aria-label", redTurn ? "黑方等待" : "黑方行棋");
   undoButton.disabled = state.moveCount === 0;
-  selectionNote.hidden = !state.selected;
-  selectionNote.textContent = state.selected
-    ? `${state.legalMoveCount} 个合法落点`
-    : "";
+  selectionNote.hidden = !state.selected && !state.thinking;
+  selectionNote.textContent = state.thinking
+    ? "思考中…"
+    : state.selected
+      ? `${state.legalMoveCount} 个合法落点`
+      : "";
 }
 
 function startLocalGame(): void {
+  game?.setAi(null);
+  game?.newGame();
   game?.start();
   renderer?.setMenuMode(false);
   menuScreen.hidden = true;
   gameScreen.hidden = false;
 }
 
+const engine = new AiEngine();
+let engineBusy = false;
+
+function showLevels(visible: boolean): void {
+  modeList.hidden = visible;
+  levelList.hidden = !visible;
+  engineError.hidden = true;
+}
+
+async function startAiGame(level: AiLevel): Promise<void> {
+  if (engineBusy) return;
+  engineBusy = true;
+  engineError.hidden = true;
+  levelList.hidden = true;
+  engineLoading.hidden = false;
+  try {
+    await engine.load(fraction => {
+      const value = Math.floor(fraction * 100);
+      engineLoadingFill.style.width = `${value}%`;
+      engineLoadingPercent.textContent = `${value}%`;
+    });
+    game?.setAi({ engine, level });
+    game?.newGame();
+    game?.start();
+    renderer?.setMenuMode(false);
+    menuScreen.hidden = true;
+    gameScreen.hidden = false;
+    showLevels(false);
+  } catch (error) {
+    console.error("AI 引擎加载失败:", error);
+    engineError.hidden = false;
+    levelList.hidden = false;
+  } finally {
+    engineLoading.hidden = true;
+    engineBusy = false;
+  }
+}
+
 function showMenu(): void {
   resultDialog.close();
   game?.newGame();
+  showLevels(false);
   gameScreen.hidden = true;
   menuScreen.hidden = false;
   renderer?.setMenuMode(true);
@@ -154,6 +204,11 @@ try {
   });
 
   startButton.addEventListener("click", startLocalGame);
+  requireElement<HTMLButtonElement>("btn-ai").addEventListener("click", () => showLevels(true));
+  requireElement<HTMLButtonElement>("btn-level-back").addEventListener("click", () => showLevels(false));
+  for (const button of levelList.querySelectorAll<HTMLButtonElement>("[data-level]")) {
+    button.addEventListener("click", () => void startAiGame(button.dataset.level as AiLevel));
+  }
   requireElement<HTMLButtonElement>("btn-undo").addEventListener("click", () => {
     game?.undo();
   });

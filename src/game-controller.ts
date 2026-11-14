@@ -7,6 +7,7 @@ import type {
 } from "./domain";
 import { BoardRenderer } from "./board-renderer";
 import { GameAudio } from "./game-audio";
+import { toFen, type AiEngine, type AiLevel } from "./ai-engine";
 
 interface PieceSnapshot {
   piece: ChessPiece;
@@ -23,6 +24,7 @@ export interface GameState {
   capturedRed: number;
   capturedBlack: number;
   lastMove: MoveRecord | null;
+  thinking: boolean;
 }
 
 export interface GameView {
@@ -44,6 +46,15 @@ export class GameController {
   private readonly renderer: BoardRenderer;
   private readonly view: GameView;
   private readonly audio = new GameAudio();
+  private ai: { engine: AiEngine; level: AiLevel } | null = null;
+  private aiToken = 0;
+  private thinking = false;
+
+  // The AI always plays black; pass null for local two-player.
+  setAi(ai: { engine: AiEngine; level: AiLevel } | null): void {
+    this.ai = ai;
+    this.cancelAi();
+  }
 
   constructor(renderer: BoardRenderer, view: GameView) {
     this.renderer = renderer;
@@ -57,26 +68,33 @@ export class GameController {
   start(): void {
     if (this.started) return;
     this.started = true;
-    this.renderer.setViewForTurn(this.turn);
+    this.renderer.setViewForTurn(this.viewTurn());
     this.render();
   }
 
   undo(): void {
     if (!this.started || this.history.length < 2) return;
+    this.cancelAi();
     this.audio.play("undo");
-    this.history.pop();
+    // Against the AI, undo rewinds to the player's previous turn (two plies).
+    const plies = this.ai && this.history.length > 2 && this.turn === this.rules.sides.red ? 2 : 1;
+    for (let i = 0; i < plies; i++) {
+      this.history.pop();
+      this.moveCount = Math.max(0, this.moveCount - 1);
+      this.turn = 1 - this.turn;
+    }
     this.restore(this.history[this.history.length - 1]);
-    this.moveCount = Math.max(0, this.moveCount - 1);
-    this.turn = 1 - this.turn;
     this.selected = null;
     this.legalMoves = [];
     this.lastMove = null;
     this.winner = null;
-    this.renderer.setViewForTurn(this.turn);
+    this.renderer.setViewForTurn(this.viewTurn());
     this.render();
+    this.queueAiMove();
   }
 
   newGame(): void {
+    this.cancelAi();
     this.board = new window.XiangqiRules.Chessboard(1);
     this.turn = this.rules.sides.red;
     this.selected = null;
@@ -90,7 +108,8 @@ export class GameController {
   }
 
   private handleBoardAction(action: BoardAction): void {
-    if (!this.started || this.winner || !action.position) {
+    const aiTurn = this.ai !== null && this.turn === this.rules.sides.black;
+    if (!this.started || this.winner || !action.position || aiTurn) {
       if (action.dragged) this.render();
       return;
     }
@@ -163,8 +182,87 @@ export class GameController {
         piece.side === this.rules.sides.red ? "redMove" : "blackMove",
       );
     }
-    this.renderer.setViewForTurn(this.turn);
+    this.renderer.setViewForTurn(this.viewTurn());
     this.notify();
+    this.queueAiMove();
+  }
+
+  // Against the AI the camera stays on the player's (red) side.
+  private viewTurn(): number {
+    return this.ai ? this.rules.sides.red : this.turn;
+  }
+
+  private cancelAi(): void {
+    this.aiToken++;
+    this.thinking = false;
+  }
+
+  private queueAiMove(): void {
+    if (!this.ai || !this.started || this.winner || this.turn !== this.rules.sides.black) return;
+    const { engine, level } = this.ai;
+    const token = ++this.aiToken;
+    this.thinking = true;
+    this.notify();
+    void (async () => {
+      const startedAt = performance.now();
+      let move = this.findGeneralCapture();
+      if (!move) {
+        const fen = toFen(this.board.state, "black", this.rules.sides.red);
+        move = await engine.search(fen, level).catch(() => null);
+      }
+      // A little pause so the reply never feels instantaneous.
+      const wait = Math.max(0, 500 - (performance.now() - startedAt));
+      await new Promise(resolve => window.setTimeout(resolve, wait));
+      if (token !== this.aiToken) return;
+      const picked = this.resolveAiMove(move) ?? this.randomAiMove();
+      if (!picked) {
+        this.thinking = false;
+        this.notify();
+        return;
+      }
+      this.selectPiece(picked.piece);
+      await new Promise(resolve => window.setTimeout(resolve, 450));
+      if (token !== this.aiToken) return;
+      this.thinking = false;
+      this.movePiece(picked.to);
+    })();
+  }
+
+  private blackPieces(): ChessPiece[] {
+    return this.board.state.flat().filter(
+      (piece): piece is ChessPiece => piece !== null && piece.side === this.rules.sides.black,
+    );
+  }
+
+  private resolveAiMove(
+    move: { from: Position; to: Position } | null,
+  ): { piece: ChessPiece; to: Position } | null {
+    if (!move) return null;
+    const piece = this.board.state[move.from.row]?.[move.from.col];
+    if (!piece || piece.side !== this.rules.sides.black) return null;
+    const legal = piece.getNextSteps(this.board.state).some(
+      step => step.row === move.to.row && step.col === move.to.col,
+    );
+    return legal ? { piece, to: move.to } : null;
+  }
+
+  // The rules module is pseudo-legal (no check detection), so always take a capturable general.
+  private findGeneralCapture(): { from: Position; to: Position } | null {
+    for (const piece of this.blackPieces()) {
+      for (const step of piece.getNextSteps(this.board.state)) {
+        if (this.board.state[step.row][step.col]?.type === this.rules.types.general) {
+          return { from: { row: piece.row, col: piece.col }, to: step };
+        }
+      }
+    }
+    return null;
+  }
+
+  private randomAiMove(): { piece: ChessPiece; to: Position } | null {
+    const options = this.blackPieces().flatMap(piece =>
+      piece.getNextSteps(this.board.state).map(to => ({ piece, to })),
+    );
+    return options.length ? options[Math.floor(Math.random() * options.length)] : null;
   }
 
   private checkWinner(): void {
@@ -229,6 +327,7 @@ export class GameController {
       capturedRed: 16 - redPieces.length,
       capturedBlack: 16 - blackPieces.length,
       lastMove: this.lastMove,
+      thinking: this.thinking,
     });
   }
 }

@@ -4,7 +4,7 @@
 
 **立即游玩：** [https://tako-xiangqi.netlify.app](https://tako-xiangqi.netlify.app)
 
-在静谧的和室棋室中，和朋友来一局中国象棋。支持本机双人对弈，沿用原有象棋规则；目前不含 AI 对手。
+在静谧的和室棋室中，和朋友来一局中国象棋，或挑战三档难度的电脑对手。沿用原有象棋规则。
 
 ## 游戏特色
 
@@ -26,10 +26,11 @@
 - 技术栈：Three.js、TypeScript。
 - 3D 场景与模型由 AI 辅助构建，贴图由 AI 辅助生成并整理。
 - 音效由 EventLabs 生成。
+- 电脑对手使用 [Pikafish](https://github.com/official-pikafish/Pikafish)（GPLv3，WebAssembly 版，在浏览器本地运行；NNUE 权重仅限非商业用途）。
 
 ## English
 
-Play Chinese chess with a friend in a quiet Japanese-style tea room. The game supports local two-player matches and keeps the original chess rules. AI opponents are not available yet.
+Play Chinese chess with a friend in a quiet Japanese-style tea room, or challenge the computer at three difficulty levels. The game keeps the original chess rules.
 
 **Play now:** [https://tako-xiangqi.netlify.app](https://tako-xiangqi.netlify.app)
 
@@ -53,3 +54,4 @@ Play Chinese chess with a friend in a quiet Japanese-style tea room. The game su
 - Tech stack: Three.js and TypeScript.
 - The 3D scene and models were AI-assisted; textures were AI-assisted and prepared for the game.
 - Sound effects were generated with EventLabs.
+- The computer opponent is [Pikafish](https://github.com/official-pikafish/Pikafish) (GPLv3, WebAssembly build running locally in the browser; the NNUE weights are for non-commercial use only).

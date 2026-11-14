@@ -1,5 +1,7 @@
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
+// CHANGE: textures use FetchTextureLoader (single fetch) instead of THREE.TextureLoader (Range requests).
+import { FetchTextureLoader } from "./fetch-texture-loader";
 import { roomTextureManifest, type PbrTextureSet } from "./textures";
 
 const FLOOR_Y = -2.6;
@@ -189,7 +191,7 @@ export class ChessRoom {
   private readonly steamTime = new THREE.Uniform(0);
   private readonly steamScale = new THREE.Uniform(1);
   private readonly lampInView = new THREE.Uniform(new THREE.Vector3());
-  private readonly loader = new THREE.TextureLoader();
+  private readonly loader = new FetchTextureLoader();
   private readonly textures = new Set<THREE.Texture>();
   private readonly environment: THREE.WebGLRenderTarget;
   private readonly teaMaterial: THREE.MeshPhysicalMaterial;

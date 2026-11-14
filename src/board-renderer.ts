@@ -5,6 +5,8 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { SSAOPass } from "three/addons/postprocessing/SSAOPass.js";
 import { SMAAPass } from "three/addons/postprocessing/SMAAPass.js";
+// CHANGE: textures use FetchTextureLoader (single fetch) instead of THREE.TextureLoader (Range requests).
+import { FetchTextureLoader } from "./fetch-texture-loader";
 import type {
   BoardAction,
   ChessPiece,
@@ -59,6 +61,8 @@ interface CameraTransition {
   angleDelta: number;
   radius: number;
   height: number;
+  toRadius: number;
+  toHeight: number;
 }
 
 interface PointerStart {
@@ -172,6 +176,7 @@ export class BoardRenderer {
   private turnPieces = new Set<ChessPiece>();
   private pointerStart: PointerStart | null = null;
   private cameraTransition: CameraTransition | null = null;
+  private wasPortrait = false;
   private pendingViewSide: number | null = null;
   private pieceAtlas: THREE.Texture | null = null;
   private hoveredPiece: ChessPiece | null = null;
@@ -226,6 +231,7 @@ export class BoardRenderer {
     this.controls.enableDamping = true;
     this.controls.dampingFactor = 0.075;
     this.controls.enabled = false;
+    this.controls.enablePan = false;
     this.controls.minDistance = 9;
     this.controls.maxDistance = 48;
     this.controls.minPolarAngle = Math.PI * 0.12;
@@ -360,12 +366,20 @@ export class BoardRenderer {
     }
     if (this.viewSide === targetSide) return;
     this.viewSide = targetSide;
-    const target = this.controls.target.clone();
-    const offset = this.camera.position.clone().sub(target);
-    const distance = Math.hypot(offset.x, offset.z);
-    this.beginCameraTransition(
-      new THREE.Vector3(0, offset.y, targetSide === red ? distance : -distance),
-    );
+    this.beginCameraTransition(this.fixedOffset(targetSide));
+  }
+
+  // Fixed oblique overview for each side; distance grows on narrow (portrait) screens
+  // so the whole board always fits.
+  private fixedOffset(side: number): THREE.Vector3 {
+    const base = new THREE.Vector3(0, 10.5, 11.2);
+    const fit =
+      CAPTURE_SCENE_WIDTH /
+      (2 * Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2)) * this.camera.aspect);
+    const scale = Math.max(1, fit / base.length());
+    base.multiplyScalar(scale);
+    if (side !== window.XiangqiRules.constants.sides.red) base.z = -base.z;
+    return base;
   }
 
   dispose(): void {
@@ -485,7 +499,7 @@ export class BoardRenderer {
 
   private loadBoardTextures(): void {
     const material = this.boardSurface.material as THREE.MeshPhysicalMaterial;
-    const loader = new THREE.TextureLoader();
+    const loader = new FetchTextureLoader();
     const loadTexture = (
       url: string | undefined,
       colorSpace: THREE.ColorSpace,
@@ -555,7 +569,7 @@ export class BoardRenderer {
   private loadPieceAtlas(): void {
     const atlasUrl = textureManifest.pieceAtlas;
     if (!atlasUrl) return;
-    new THREE.TextureLoader().load(
+    new FetchTextureLoader().load(
       atlasUrl,
       texture => {
         texture.colorSpace = THREE.SRGBColorSpace;
@@ -586,7 +600,7 @@ export class BoardRenderer {
     ];
 
     if (individualTexture) {
-      new THREE.TextureLoader().load(
+      new FetchTextureLoader().load(
         individualTexture,
         texture => {
           texture.colorSpace = THREE.SRGBColorSpace;
@@ -955,7 +969,7 @@ void main() {
     const currentOffset = this.camera.position.clone().sub(target);
     const fromAngle = Math.atan2(currentOffset.x, currentOffset.z);
     const toAngle = Math.atan2(offset.x, offset.z);
-    const angleDelta = -THREE.MathUtils.euclideanModulo(fromAngle - toAngle, Math.PI * 2);
+    const angleDelta = THREE.MathUtils.euclideanModulo(toAngle - fromAngle + Math.PI, Math.PI * 2) - Math.PI;
     if (this.reducedMotion.matches) {
       this.camera.position.copy(target).add(offset);
       this.camera.lookAt(target);
@@ -972,6 +986,8 @@ void main() {
       angleDelta,
       radius: Math.hypot(currentOffset.x, currentOffset.z),
       height: currentOffset.y,
+      toRadius: Math.hypot(offset.x, offset.z),
+      toHeight: offset.y,
     };
   }
 
@@ -1044,10 +1060,12 @@ void main() {
     const progress = Math.min(1, (elapsed - transition.start) / transition.duration);
     const eased = progress * progress * (3 - 2 * progress);
     const angle = transition.fromAngle + transition.angleDelta * eased;
+    const radius = THREE.MathUtils.lerp(transition.radius, transition.toRadius, eased);
+    const height = THREE.MathUtils.lerp(transition.height, transition.toHeight, eased);
     this.camera.position.set(
-      transition.target.x + Math.sin(angle) * transition.radius,
-      transition.target.y + transition.height,
-      transition.target.z + Math.cos(angle) * transition.radius,
+      transition.target.x + Math.sin(angle) * radius,
+      transition.target.y + height,
+      transition.target.z + Math.cos(angle) * radius,
     );
     this.camera.lookAt(transition.target);
     if (progress >= 1) {
@@ -1252,6 +1270,17 @@ void main() {
       frameWidth /
       (2 * Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2)) * this.camera.aspect);
     this.controls.maxDistance = Math.max(48, minDistance * 1.35);
+    const portrait = this.camera.aspect < 1;
+    const orientationChanged = portrait !== this.wasPortrait;
+    this.wasPortrait = portrait;
+    if (orientationChanged && !this.menuMode && !this.cameraTransition) {
+      // Rotating the device re-frames the fixed overview instead of keeping a stale distance.
+      this.camera.position
+        .copy(this.controls.target)
+        .add(this.fixedOffset(this.viewSide ?? window.XiangqiRules.constants.sides.red));
+      this.camera.lookAt(this.controls.target);
+      return;
+    }
     const offset = this.camera.position.clone().sub(this.controls.target);
     if (offset.length() < minDistance) {
       this.camera.position
