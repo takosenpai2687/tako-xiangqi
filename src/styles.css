@@ -737,8 +737,81 @@ button svg {
 }
 
 .hud-actions {
+  --action-gap: clamp(28px, 3vw, 42px);
   align-items: center;
-  gap: clamp(28px, 3vw, 42px);
+  gap: var(--action-gap);
+}
+
+.hint-controls {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: calc(var(--action-gap) * 0.618);
+}
+
+.hint-controls[hidden],
+.hint-levels[hidden],
+.hint-feedback[hidden] {
+  display: none;
+}
+
+.hint-levels {
+  position: absolute;
+  bottom: calc(100% + 12px);
+  left: 0;
+  display: grid;
+  width: 144px;
+  min-width: 0;
+  margin: 0;
+  padding: 6px;
+  gap: 4px;
+  border: 0;
+  border-radius: 4px 14px 4px 14px;
+  background: var(--panel-raised);
+  pointer-events: auto;
+}
+
+.hint-levels label {
+  position: relative;
+  cursor: pointer;
+}
+
+.hint-levels span {
+  display: grid;
+  min-height: 44px;
+  padding: 8px 16px;
+  place-items: center;
+  border-radius: 2px 10px 2px 10px;
+  color: var(--ink);
+  font-size: 16px;
+}
+
+.hint-levels input:checked + span {
+  background: var(--accent);
+  color: var(--ground);
+}
+
+.hint-levels input:focus-visible + span {
+  outline: 3px solid var(--ground);
+  outline-offset: -3px;
+}
+
+.hint-feedback {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 12px);
+  width: max-content;
+  max-width: calc(100vw - 28px);
+  padding: 12px 16px;
+  border-radius: 4px;
+  background: var(--panel);
+  color: var(--ink);
+  font-size: 14px;
+}
+
+#btn-hint[aria-busy="true"] {
+  color: var(--accent);
+  animation: loading-breathe 1.8s ease-in-out infinite;
 }
 
 .result-dialog {
@@ -967,7 +1040,7 @@ button svg {
   }
 
   .hud-actions {
-    gap: 16px;
+    --action-gap: 16px;
   }
 
   .back-button {

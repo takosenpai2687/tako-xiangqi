@@ -31,6 +31,10 @@ export interface GameState {
   lastMove: MoveRecord | null;
   thinking: boolean;
   humanSide: number | null;
+  canHint: boolean;
+  hintThinking: boolean;
+  hintError: boolean;
+  hintLevel: AiLevel;
 }
 
 const TEA_SOUNDS = { lift: "cupLift", sip: "teaSip", place: "cupPlace" } as const;
@@ -64,10 +68,57 @@ export class GameController {
   private aiSearch: Promise<AiMove | null> | null = null;
   private aiToken = 0;
   private thinking = false;
+  private hintToken = 0;
+  private hintThinking = false;
+  private hintError = false;
+  private hintLevel: AiLevel = "normal";
 
   setAi(ai: { engine: AiEngine; level: AiLevel; humanSide: number } | null): void {
     this.ai = ai;
     this.cancelAi();
+    this.hintLevel = ai?.level === "easy" ? "normal" : "hard";
+  }
+
+  setHintLevel(level: AiLevel): void {
+    if (level === this.hintLevel) return;
+    this.hintLevel = level;
+    this.clearHint();
+    this.notify();
+  }
+
+  private get canHint(): boolean {
+    return this.ai !== null && this.started && !this.winner
+      && this.turn === this.ai.humanSide && !this.thinking && !this.hintThinking;
+  }
+
+  async requestHint(): Promise<void> {
+    if (!this.canHint || !this.ai) return;
+    this.clearHint();
+    const token = this.hintToken;
+    this.hintThinking = true;
+    this.notify();
+    try {
+      const move = await this.searchMove(this.ai.engine, this.hintLevel, () => token === this.hintToken);
+      if (token !== this.hintToken) return;
+      const picked = this.resolveAiMove(move, this.turn);
+      if (!picked) throw new Error("The hint engine returned no legal move.");
+      this.clearHint();
+      this.selectPiece(picked.piece);
+      this.renderer.setHint(picked.to);
+    } catch (error) {
+      if (token !== this.hintToken) return;
+      console.error("Could not calculate a hint:", error);
+      this.clearHint();
+      this.hintError = true;
+      this.notify();
+    }
+  }
+
+  private clearHint(): void {
+    this.hintToken++;
+    this.hintThinking = false;
+    this.hintError = false;
+    this.renderer.setHint(null);
   }
 
   constructor(renderer: BoardRenderer, view: GameView) {
@@ -157,6 +208,13 @@ export class GameController {
     }
 
     if (this.selected) {
+      if (action.piece === this.selected) {
+        this.clearHint();
+        this.selected = null;
+        this.legalMoves = [];
+        this.render();
+        return;
+      }
       if (action.piece?.side === this.turn) {
         this.selectPiece(action.piece);
         return;
@@ -173,6 +231,7 @@ export class GameController {
   }
 
   private selectPiece(piece: ChessPiece): void {
+    if (piece !== this.selected) this.clearHint();
     this.audio.play("pickup");
     this.selected = piece;
     this.legalMoves = piece.getNextSteps(this.board.state);
@@ -187,6 +246,7 @@ export class GameController {
 
   private movePiece(position: Position): void {
     if (!this.selected) return;
+    this.clearHint();
     const piece = this.selected;
     const from = { row: piece.row, col: piece.col };
     const captured = this.board.state[position.row][position.col];
@@ -225,6 +285,26 @@ export class GameController {
   private cancelAi(): void {
     this.aiToken++;
     this.thinking = false;
+    this.clearHint();
+  }
+
+  private searchMove(engine: AiEngine, level: AiLevel, isCurrent: () => boolean): Promise<AiMove | null> {
+    const previous = this.aiSearch;
+    // Opponent and hint searches share one worker and must never overlap.
+    this.aiSearch = (async () => {
+      if (previous) await previous;
+      if (!isCurrent()) return null;
+      const fen = toFen(
+        this.board.state,
+        this.turn === this.rules.sides.red ? "red" : "black",
+        this.rules.sides.red,
+      );
+      return engine.search(fen, level);
+    })().catch(error => {
+      console.warn("AI search failed:", error);
+      return null;
+    });
+    return this.aiSearch;
   }
 
   private queueAiMove(): void {
@@ -234,25 +314,10 @@ export class GameController {
     this.thinking = true;
     this.notify();
     void (async () => {
-      // Let a cancelled search finish before reusing the worker after undo or restart.
-      if (this.aiSearch) {
-        await this.aiSearch;
-        if (token !== this.aiToken) return;
-      }
       const startedAt = performance.now();
       let move = this.findGeneralCapture();
       if (!move) {
-        const fen = toFen(
-          this.board.state,
-          this.turn === this.rules.sides.red ? "red" : "black",
-          this.rules.sides.red,
-        );
-        this.aiSearch = engine.search(fen, level).catch(error => {
-          console.warn("AI search failed; choosing a legal fallback move:", error);
-          return null;
-        });
-        move = await this.aiSearch;
-        this.aiSearch = null;
+        move = await this.searchMove(engine, level, () => token === this.aiToken);
       }
       // A little pause so the reply never feels instantaneous.
       const wait = Math.max(0, 500 - (performance.now() - startedAt));
@@ -280,10 +345,11 @@ export class GameController {
 
   private resolveAiMove(
     move: { from: Position; to: Position } | null,
+    side: number | null = this.aiSide,
   ): { piece: ChessPiece; to: Position } | null {
     if (!move) return null;
     const piece = this.board.state[move.from.row]?.[move.from.col];
-    if (!piece || piece.side !== this.aiSide) return null;
+    if (!piece || piece.side !== side) return null;
     const legal = piece.getNextSteps(this.board.state).some(
       step => step.row === move.to.row && step.col === move.to.col,
     );
@@ -382,6 +448,10 @@ export class GameController {
       lastMove: this.lastMove,
       thinking: this.thinking,
       humanSide: this.ai?.humanSide ?? null,
+      canHint: this.canHint,
+      hintThinking: this.hintThinking,
+      hintError: this.hintError,
+      hintLevel: this.hintLevel,
     });
   }
 }

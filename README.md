@@ -21,6 +21,8 @@ Play Chinese chess with a friend in a quiet Japanese-style tea room, or challeng
 - Both pieces' lettering briefly lights up during a capture.
 - Distinct red and black move sounds, plus piece pickup, capture, and undo sounds.
 - Undo, restart, and a victory screen.
+- AI games include a hint with its own difficulty setting (one level above the opponent by default, capped at hard). It selects the suggested piece and adds a pulsing red destination ring without hiding legal moves. Selecting another piece or deselecting clears the hint.
+- Click a selected piece again to deselect it.
 - Chinese and English UI: defaults to Chinese for a Chinese browser language, otherwise English. Choose from the main menu; your choice is saved locally and takes priority on future visits. Piece textures remain unchanged.
 - Graphics settings for ambient occlusion, depth of field, anti-aliasing, and volumetric light.
 - Online resources are automatically routed to Alibaba Cloud for mainland China and Netlify for other regions. Local development and localhost previews always use local assets.
@@ -58,6 +60,8 @@ Play Chinese chess with a friend in a quiet Japanese-style tea room, or challeng
 - 吃子时，双方棋子的字样会短暂发光。
 - 红黑双方使用不同的落子音效，并提供选子、吃子和悔棋音效。
 - 支持悔棋、重开与胜局提示。
+- 人机对战支持提示及独立难度设置，默认比对手高一档（最高为困难）；提示会选中推荐棋子，并用红色呼吸光圈标出落点，同时保留全部合法落点。切换棋子或取消选中后退出提示。
+- 再次点击已选中的棋子可取消选中。
 - 首次访问跟随浏览器语言：中文环境默认中文，其余默认英文。主菜单可切换语言，本机记住选择，下次访问优先使用；棋子贴图不变。
 - 可调整环境光遮蔽、景深、抗锯齿与体积光。
 - 线上资源按地区自动分流：中国大陆使用阿里云，其他地区使用 Netlify。本地开发及 localhost 预览始终使用本地资源。

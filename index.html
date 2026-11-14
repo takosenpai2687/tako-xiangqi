@@ -224,6 +224,23 @@
           </span>
         </div>
         <div class="hud-actions">
+          <div class="hint-controls" id="hint-controls" hidden>
+            <button class="hud-button" id="btn-hint-settings" type="button" aria-label="提示难度" title="提示难度" aria-controls="hint-settings" aria-expanded="false">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M9.5 3h5l.5 2 1.5 1 2-.5 2.5 4-1.5 1.5v2l1.5 1.5-2.5 4-2-.5-1.5 1-.5 2h-5L9 19l-1.5-1-2 .5-2.5-4L4.5 13v-2L3 9.5l2.5-4 2 .5L9 5z" />
+                <circle cx="12" cy="12" r="3" />
+              </svg>
+            </button>
+            <fieldset class="hint-levels" id="hint-settings" aria-label="提示难度" hidden>
+              <label><input class="sr-only" type="radio" name="hint-level" value="easy" /><span data-i18n="简单">简单</span></label>
+              <label><input class="sr-only" type="radio" name="hint-level" value="normal" checked /><span data-i18n="普通">普通</span></label>
+              <label><input class="sr-only" type="radio" name="hint-level" value="hard" /><span data-i18n="困难">困难</span></label>
+            </fieldset>
+            <button class="hud-button action-button" id="btn-hint" type="button" aria-label="提示" title="提示" disabled>
+              <span data-i18n="提示">提示</span>
+            </button>
+          </div>
+          <span class="hint-feedback" id="hint-error" role="status" hidden data-i18n="提示计算失败，请重试">提示计算失败，请重试</span>
           <button
             class="hud-button action-button"
             id="btn-undo"

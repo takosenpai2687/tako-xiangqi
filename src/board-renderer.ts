@@ -185,6 +185,7 @@ export class BoardRenderer {
   private readonly woodColorTexture: THREE.Texture;
   private readonly woodBumpTexture: THREE.Texture;
   private readonly moveMarkers = new THREE.Group();
+  private readonly hintMarker = new THREE.Group();
   private readonly riverLabels = new THREE.Group();
   private readonly boardSurface = new THREE.Mesh(
     new THREE.PlaneGeometry(BOARD_WIDTH + 0.25, BOARD_DEPTH + 0.25),
@@ -291,6 +292,7 @@ export class BoardRenderer {
     );
     this.loadPieceAtlas();
     this.scene.add(this.moveMarkers);
+    this.scene.add(this.hintMarker);
 
     // Capture phase: a press that lands on a piece is consumed before OrbitControls
     // (listening on the same canvas) can start rotating the camera.
@@ -307,6 +309,32 @@ export class BoardRenderer {
 
   setActionHandler(handler: (action: BoardAction) => void): void {
     this.onAction = handler;
+  }
+
+  setHint(position: Position | null): void {
+    this.clearGroup(this.hintMarker);
+    if (!position) return;
+    const occupied = this.getPieceAt(position.row, position.col) !== null;
+    const ring = new THREE.Mesh(
+      new THREE.TorusGeometry(occupied ? PIECE_RADIUS * 1.5 : 0.38, 0.055, 12, 64),
+      new THREE.MeshStandardMaterial({
+        color: "#d90015",
+        emissive: "#ff0026",
+        emissiveIntensity: 3,
+        transparent: true,
+        opacity: 0.9,
+        roughness: 0.5,
+        depthWrite: false,
+        depthTest: false,
+        toneMapped: false,
+        fog: false,
+      }),
+    );
+    ring.rotation.x = Math.PI / 2;
+    ring.renderOrder = 12;
+    ring.name = "hint-destination";
+    this.hintMarker.position.set(this.worldX(position.col), BOARD_TOP + 0.025, this.worldZ(position.row));
+    this.hintMarker.add(ring);
   }
 
   setTeaSide(side: TeaSide | null): void {
@@ -485,6 +513,7 @@ export class BoardRenderer {
     this.woodColorTexture.dispose();
     this.woodBumpTexture.dispose();
     this.pieceAtlas?.dispose();
+    this.clearGroup(this.hintMarker);
     for (const label of this.riverLabels.children) {
       if (label instanceof THREE.Mesh && label.material instanceof THREE.MeshBasicMaterial) {
         label.material.map?.dispose();
@@ -1310,6 +1339,14 @@ void main() {
   }
 
   private updateSelection(elapsed: number): void {
+    const hintPulse = this.reducedMotion.matches ? 0.5 : 0.5 + 0.5 * Math.sin(elapsed * 3);
+    this.hintMarker.scale.setScalar(1 + hintPulse * 0.08);
+    for (const ring of this.hintMarker.children) {
+      if (ring instanceof THREE.Mesh && ring.material instanceof THREE.MeshStandardMaterial) {
+        ring.material.emissiveIntensity = 1.5 + hintPulse * 3;
+        ring.material.opacity = 0.7 + hintPulse * 0.3;
+      }
+    }
     const menuBreath = 0.5 - 0.5 * Math.cos(elapsed * Math.PI / 3);
     this.menuGlyphStrength.value = this.menuMode && !this.reducedMotion.matches
       ? 4.5 * menuBreath * menuBreath

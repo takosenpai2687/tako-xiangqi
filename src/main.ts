@@ -33,6 +33,11 @@ const selectionNote = requireElement<HTMLElement>("selection-note");
 const redPlayer = requireElement<HTMLElement>("red-player");
 const blackPlayer = requireElement<HTMLElement>("black-player");
 const undoButton = requireElement<HTMLButtonElement>("btn-undo");
+const hintControls = requireElement<HTMLElement>("hint-controls");
+const hintButton = requireElement<HTMLButtonElement>("btn-hint");
+const hintSettingsButton = requireElement<HTMLButtonElement>("btn-hint-settings");
+const hintSettings = requireElement<HTMLFieldSetElement>("hint-settings");
+const hintError = requireElement<HTMLElement>("hint-error");
 const resultDialog = requireElement<HTMLDialogElement>("result-dialog");
 const resultTitle = requireElement<HTMLElement>("result-title");
 const resultEmblem = requireElement<HTMLElement>("result-emblem");
@@ -161,6 +166,11 @@ DefaultLoadingManager.onLoad = () => {
   );
 };
 
+function closeHintSettings(): void {
+  hintSettings.hidden = true;
+  hintSettingsButton.setAttribute("aria-expanded", "false");
+}
+
 function describeState(state: GameState): void {
   lastState = state;
   const redTurn = state.turn === sides.red;
@@ -172,14 +182,24 @@ function describeState(state: GameState): void {
   redPlayer.setAttribute("aria-label", t(redTurn ? "红方行棋" : "红方等待"));
   blackPlayer.setAttribute("aria-label", t(redTurn ? "黑方等待" : "黑方行棋"));
   undoButton.disabled = !state.canUndo;
+  hintControls.hidden = state.humanSide === null;
+  hintButton.disabled = !state.canHint;
+  hintButton.setAttribute("aria-busy", String(state.hintThinking));
+  hintError.hidden = !state.hintError;
+  for (const radio of hintSettings.querySelectorAll<HTMLInputElement>("input")) {
+    radio.checked = radio.value === state.hintLevel;
+  }
+  if (!state.started || state.humanSide === null) closeHintSettings();
   updateRoster("red", state.aliveRed);
   updateRoster("black", state.aliveBlack);
   // Keep the human at the bottom against the AI; local play follows the turn.
   const redBottom = state.humanSide === null ? redTurn : state.humanSide === sides.red;
   redPlayer.style.order = redBottom ? "1" : "0";
   blackPlayer.style.order = redBottom ? "0" : "1";
-  selectionNote.hidden = !state.selected && !state.thinking;
-  selectionNote.textContent = state.thinking
+  selectionNote.hidden = !state.selected && !state.thinking && !state.hintThinking;
+  selectionNote.textContent = state.hintThinking
+    ? t("正在计算提示…")
+    : state.thinking
     ? t("思考中…")
     : state.selected
       ? t("{count} 个合法落点", state.legalMoveCount)
@@ -335,6 +355,30 @@ async function initializeGame(): Promise<void> {
     }
     requireElement<HTMLButtonElement>("btn-undo").addEventListener("click", () => {
       game?.undo();
+    });
+    hintButton.addEventListener("click", () => {
+      closeHintSettings();
+      void game?.requestHint();
+    });
+    hintSettingsButton.addEventListener("click", () => {
+      hintSettings.hidden = !hintSettings.hidden;
+      hintSettingsButton.setAttribute("aria-expanded", String(!hintSettings.hidden));
+      if (!hintSettings.hidden) hintSettings.querySelector<HTMLInputElement>("input:checked")?.focus();
+    });
+    for (const radio of hintSettings.querySelectorAll<HTMLInputElement>("input")) {
+      radio.addEventListener("change", () => {
+        const level = radio.value;
+        if (level === "easy" || level === "normal" || level === "hard") game?.setHintLevel(level);
+      });
+    }
+    document.addEventListener("pointerdown", event => {
+      if (event.target instanceof Node && !hintControls.contains(event.target)) closeHintSettings();
+    });
+    document.addEventListener("keydown", event => {
+      if (event.key === "Escape" && !hintSettings.hidden) {
+        closeHintSettings();
+        hintSettingsButton.focus();
+      }
     });
     requireElement<HTMLButtonElement>("btn-new-game").addEventListener("click", restartGame);
     requireElement<HTMLButtonElement>("btn-rematch").addEventListener("click", restartGame);
