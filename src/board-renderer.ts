@@ -19,6 +19,9 @@ import { constants } from "./rules";
 import { textureManifest } from "./textures";
 import { CaptureBoxes, CAPTURE_SCENE_WIDTH } from "./capture-boxes";
 import { RoomAtmospherePass } from "./room-atmosphere-pass";
+import { FinishPass } from "./finish-pass";
+import { DustMotes } from "./dust-motes";
+import { loadQuality, type QualitySettings } from "./quality";
 import { ChessRoom, type TeaSide, type TeaSound } from "./chess-room";
 
 const BOARD_WIDTH = 8;
@@ -156,6 +159,10 @@ export class BoardRenderer {
   private readonly ssaoPass: SSAOPass;
   private readonly bloomPass: UnrealBloomPass;
   private readonly atmospherePass: RoomAtmospherePass;
+  private readonly finishPass = new FinishPass();
+  private readonly smaaPass = new SMAAPass();
+  private quality: QualitySettings = loadQuality();
+  private readonly dust = new DustMotes(new THREE.Vector3(0, 3.2, 0), new THREE.Vector3(12, 5, 10));
   private readonly room: ChessRoom;
   private readonly controls: OrbitControls;
   private readonly captureBoxes: CaptureBoxes;
@@ -264,7 +271,10 @@ export class BoardRenderer {
     this.bloomPass = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.28, 0.7, 0.92);
     this.composer.addPass(this.bloomPass);
     this.composer.addPass(new OutputPass());
-    this.composer.addPass(new SMAAPass());
+    this.composer.addPass(this.smaaPass);
+    this.composer.addPass(this.finishPass);
+    this.scene.add(this.dust.points);
+    this.setQuality(loadQuality());
     this.captureBoxes = new CaptureBoxes(
       this.scene,
       this.boardSurface.material,
@@ -449,6 +459,7 @@ export class BoardRenderer {
     this.bloomPass.dispose();
     this.contactMap?.dispose();
     this.atmospherePass.dispose();
+    this.dust.dispose();
     this.composer.dispose();
     this.woodColorTexture.dispose();
     this.woodBumpTexture.dispose();
@@ -1078,10 +1089,30 @@ void main() {
     };
   }
 
+  setQuality(quality: QualitySettings): void {
+    this.quality = quality;
+    // The room passes read the SSAO pass depth buffer, so it keeps rendering (invisibly) while they need it.
+    const needsDepth = quality.dof || quality.volumetric;
+    this.ssaoPass.enabled = quality.ssao > 0 || needsDepth;
+    const strong = quality.ssao === 2;
+    this.ssaoPass.kernelRadius = strong ? 1.1 : 0.4;
+    this.ssaoPass.maxDistance = strong ? 0.035 : 0.012;
+    this.ssaoPass.copyMaterial.uniforms.opacity.value = quality.ssao === 0 ? 0 : strong ? 0.9 : 0.42;
+    this.atmospherePass.setEffects(quality.dof, quality.volumetric);
+    this.smaaPass.enabled = quality.antialias;
+    this.dust.points.visible = quality.volumetric;
+  }
+
+  getQuality(): QualitySettings {
+    return this.quality;
+  }
+
   private animate = (): void => {
     this.frameId = requestAnimationFrame(this.animate);
     const elapsed = this.now.getElapsedTime();
     this.atmospherePass.update(this.reducedMotion.matches ? 0 : elapsed);
+    this.dust.update(this.reducedMotion.matches ? 0 : elapsed);
+    this.finishPass.update(elapsed);
     this.updatePieces(elapsed);
     this.captureBoxes.update(elapsed);
     if (this.pendingViewSide !== null && !this.captureBoxes.isAnimating) {

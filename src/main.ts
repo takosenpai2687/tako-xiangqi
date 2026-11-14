@@ -2,6 +2,7 @@ import { DefaultLoadingManager } from "three";
 import { BoardRenderer } from "./board-renderer";
 import { GameController, type GameState } from "./game-controller";
 import { AiEngine, type AiLevel } from "./ai-engine";
+import { saveQuality, type QualitySettings } from "./quality";
 import { constants } from "./rules";
 import "./styles.css";
 
@@ -34,6 +35,7 @@ const resultEmblem = requireElement<HTMLElement>("result-emblem");
 const startButton = requireElement<HTMLButtonElement>("btn-local");
 const modeList = requireElement<HTMLElement>("btn-local").parentElement as HTMLElement;
 const levelList = requireElement<HTMLElement>("level-list");
+const settingsList = requireElement<HTMLElement>("settings-list");
 const engineLoading = requireElement<HTMLElement>("engine-loading");
 const engineLoadingFill = requireElement<HTMLElement>("engine-loading-fill");
 const engineLoadingPercent = requireElement<HTMLElement>("engine-loading-percent");
@@ -198,9 +200,26 @@ let engineBusy = false;
 function showLevels(visible: boolean): void {
   modeList.hidden = visible;
   levelList.hidden = !visible;
+  settingsList.hidden = true;
   engineError.hidden = true;
 }
 
+function showSettings(visible: boolean): void {
+  modeList.hidden = visible;
+  settingsList.hidden = !visible;
+  levelList.hidden = true;
+  engineError.hidden = true;
+}
+
+function syncQualityButtons(): void {
+  const quality = renderer?.getQuality();
+  if (!quality) return;
+  for (const button of settingsList.querySelectorAll<HTMLButtonElement>("[data-quality]")) {
+    const value = quality[button.dataset.quality as keyof QualitySettings];
+    button.setAttribute("aria-checked", String(Boolean(value)));
+    button.dataset.level = String(value);
+  }
+}
 async function startAiGame(level: AiLevel): Promise<void> {
   if (engineBusy) return;
   engineBusy = true;
@@ -266,6 +285,20 @@ try {
   startButton.addEventListener("click", startLocalGame);
   requireElement<HTMLButtonElement>("btn-ai").addEventListener("click", () => showLevels(true));
   requireElement<HTMLButtonElement>("btn-level-back").addEventListener("click", () => showLevels(false));
+  requireElement<HTMLButtonElement>("btn-settings").addEventListener("click", () => showSettings(true));
+  requireElement<HTMLButtonElement>("btn-settings-back").addEventListener("click", () => showSettings(false));
+  syncQualityButtons();
+  for (const button of settingsList.querySelectorAll<HTMLButtonElement>("[data-quality]")) {
+    button.addEventListener("click", () => {
+      if (!renderer) return;
+      const key = button.dataset.quality as keyof QualitySettings;
+      const current = renderer.getQuality();
+      const next = { ...current, [key]: key === "ssao" ? (current.ssao + 1) % 3 : !current[key] };
+      renderer.setQuality(next);
+      saveQuality(next);
+      syncQualityButtons();
+    });
+  }
   for (const button of levelList.querySelectorAll<HTMLButtonElement>("[data-level]")) {
     button.addEventListener("click", () => void startAiGame(button.dataset.level as AiLevel));
   }

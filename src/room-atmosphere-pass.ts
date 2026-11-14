@@ -5,6 +5,8 @@ export class RoomAtmospherePass extends ShaderPass {
   private readonly time = new THREE.Uniform(0);
   private readonly texel = new THREE.Uniform(new THREE.Vector2(1, 1));
   private readonly blurScale = new THREE.Uniform(1);
+  private readonly dof = new THREE.Uniform(1);
+  private readonly volume = new THREE.Uniform(1);
 
   constructor(
     camera: THREE.PerspectiveCamera,
@@ -24,6 +26,8 @@ export class RoomAtmospherePass extends ShaderPass {
         uFocus: new THREE.Uniform(focus),
         uTexel: new THREE.Uniform(new THREE.Vector2(1, 1)),
         uBlurScale: new THREE.Uniform(1),
+        uDof: new THREE.Uniform(1),
+        uVolume: new THREE.Uniform(1),
         uTime: new THREE.Uniform(0),
         uVolumeMin: new THREE.Uniform(volume.min),
         uVolumeMax: new THREE.Uniform(volume.max),
@@ -50,6 +54,8 @@ uniform mat4 uViewMatrix;
 uniform vec3 uFocus;
 uniform vec2 uTexel;
 uniform float uBlurScale;
+uniform float uDof;
+uniform float uVolume;
 uniform float uTime;
 uniform vec3 uVolumeMin;
 uniform vec3 uVolumeMax;
@@ -102,13 +108,12 @@ void main() {
   vec4 original = textureLod(tDiffuse, vUv, 0.0);
   vec3 view = viewPosition(vUv);
   vec3 world = (uCameraMatrix * vec4(view, 1.0)).xyz;
-  // Depth of field affects the room, not the game or tea. It stays under one pixel
-  // so the shoji lattice and wall texture remain crisp.
+  // Depth of field affects the room, not the game or tea.
   bool foreground = world.y >= -0.4 && abs(world.x) < 9.1 && abs(world.z) < 6.5;
   float focusDepth = -(uViewMatrix * vec4(uFocus, 1.0)).z;
   float radius = foreground
     ? 0.0
-    : smoothstep(6.0, 30.0, abs(-view.z - focusDepth)) * 0.9 * uBlurScale;
+    : smoothstep(4.0, 22.0, abs(-view.z - focusDepth)) * 3.2 * uBlurScale * uDof;
   vec3 color = original.rgb;
   float total = 1.0;
   for (int i = 0; i < 16; i++) {
@@ -122,7 +127,7 @@ void main() {
   }
   color /= total;
   vec3 ray = normalize(mat3(uCameraMatrix) * view);
-  gl_FragColor = vec4(roomScattering(ray, length(view), color), original.a);
+  gl_FragColor = vec4(uVolume > 0.5 ? roomScattering(ray, length(view), color) : color, original.a);
 }`,
       depthTest: false,
       depthWrite: false,
@@ -130,6 +135,14 @@ void main() {
     this.uniforms.uTime = this.time;
     this.uniforms.uTexel = this.texel;
     this.uniforms.uBlurScale = this.blurScale;
+    this.uniforms.uDof = this.dof;
+    this.uniforms.uVolume = this.volume;
+  }
+
+  setEffects(dof: boolean, volumetric: boolean): void {
+    this.dof.value = dof ? 1 : 0;
+    this.volume.value = volumetric ? 1 : 0;
+    this.enabled = dof || volumetric;
   }
 
   update(elapsed: number): void {

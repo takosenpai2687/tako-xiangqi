@@ -927,3 +927,86 @@ button svg {
     transition-duration: 0.01ms !important;
   }
 }
+
+.mode-settings {
+  color: var(--muted);
+}
+
+.mode-toggle {
+  min-height: 60px;
+}
+
+.mode-toggle .switch {
+  position: relative;
+  display: block;
+  width: 46px;
+  height: 26px;
+  margin-left: auto;
+  border: 2px solid var(--line);
+  border-radius: 13px;
+  transition: background 160ms ease, border-color 160ms ease;
+}
+
+.mode-toggle .switch::after {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--muted);
+  content: "";
+  transition: transform 160ms ease, background 160ms ease;
+}
+
+.mode-toggle[aria-checked="true"] .switch {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+.mode-toggle[aria-checked="true"] .switch::after {
+  background: var(--ground);
+  transform: translateX(20px);
+}
+
+.mode-toggle:hover {
+  transform: translateX(6px);
+  border-color: var(--accent);
+}
+
+.mode-toggle .level {
+  display: flex;
+  margin-left: auto;
+  gap: 6px;
+}
+
+.mode-toggle .level b {
+  width: 16px;
+  height: 8px;
+  border-radius: 2px;
+  background: var(--line);
+  transition: background 160ms ease;
+}
+
+.mode-toggle[data-level="1"] .level b:first-child,
+.mode-toggle[data-level="2"] .level b {
+  background: var(--accent);
+}
+.mode-toggle .level {
+  align-items: center;
+}
+
+.mode-toggle .level::before {
+  margin-right: 8px;
+  color: var(--muted);
+  font-size: 16px;
+  content: "关";
+}
+
+.mode-toggle[data-level="1"] .level::before {
+  content: "低";
+}
+
+.mode-toggle[data-level="2"] .level::before {
+  content: "高";
+}
