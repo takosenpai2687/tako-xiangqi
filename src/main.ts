@@ -161,7 +161,24 @@ function describeState(state: GameState): void {
       : "";
 }
 
+const TITLES = {
+  menu: "tako-xiangqi · 3D 中国象棋",
+  local: "本机对战 · tako-xiangqi",
+  ai: "人机对战 · tako-xiangqi",
+};
+
+function setScreenTitle(screen: keyof typeof TITLES): void {
+  document.title = TITLES[screen];
+  // GTM only sees the title at load; this event lets a trigger send a virtual page view.
+  (window as unknown as { dataLayer?: unknown[] }).dataLayer?.push({
+    event: "screen_view",
+    page_title: document.title,
+    screen_name: screen,
+  });
+}
+
 function startLocalGame(): void {
+  setScreenTitle("local");
   game?.setAi(null);
   game?.newGame();
   game?.start();
@@ -191,6 +208,7 @@ async function startAiGame(level: AiLevel): Promise<void> {
       engineLoadingFill.style.width = `${value}%`;
       engineLoadingPercent.textContent = `${value}%`;
     });
+    setScreenTitle("ai");
     game?.setAi({ engine, level });
     game?.newGame();
     game?.start();
@@ -210,6 +228,7 @@ async function startAiGame(level: AiLevel): Promise<void> {
 
 function showMenu(): void {
   resultDialog.close();
+  setScreenTitle("menu");
   game?.newGame();
   showLevels(false);
   gameScreen.hidden = true;
