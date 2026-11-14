@@ -409,7 +409,10 @@ export class ChessRoom {
         "#include <emissivemap_fragment>",
         `#include <emissivemap_fragment>
 float teaRim = smoothstep(0.455, 0.525, vTeaRadius);
-totalEmissiveRadiance += vec3(0.2, 0.21, 0.09) * teaRim * teaRim;`,
+totalEmissiveRadiance += vec3(0.2, 0.21, 0.09) * teaRim * teaRim;
+// Fresnel: the surface turns mirror-like at grazing angles and picks up the warm room.
+float teaFresnel = pow(1.0 - clamp(dot(normalize(normal), normalize(vViewPosition)), 0.0, 1.0), 4.0);
+totalEmissiveRadiance += vec3(0.55, 0.48, 0.36) * teaFresnel * 0.5;`,
       );
     };
     this.load(roomTextureManifest.teaNormal, THREE.NoColorSpace, texture => {

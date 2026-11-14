@@ -5,6 +5,7 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { SSAOPass } from "three/addons/postprocessing/SSAOPass.js";
 import { SMAAPass } from "three/addons/postprocessing/SMAAPass.js";
+import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 // CHANGE: textures use FetchTextureLoader (single fetch) instead of THREE.TextureLoader (Range requests).
 import { FetchTextureLoader } from "./fetch-texture-loader";
 import type {
@@ -152,6 +153,7 @@ export class BoardRenderer {
   private readonly renderer: THREE.WebGLRenderer;
   private readonly composer: EffectComposer;
   private readonly ssaoPass: SSAOPass;
+  private readonly bloomPass: UnrealBloomPass;
   private readonly atmospherePass: RoomAtmospherePass;
   private readonly room: ChessRoom;
   private readonly controls: OrbitControls;
@@ -215,9 +217,9 @@ export class BoardRenderer {
     });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFShadowMap;
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1;
+    this.renderer.toneMappingExposure = 1.09;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
 
     this.composer = new EffectComposer(this.renderer);
@@ -257,6 +259,9 @@ export class BoardRenderer {
       this.camera, sceneDepth, this.controls.target, this.room.ceilingLight, this.room.volume,
     );
     this.composer.addPass(this.atmospherePass);
+    // Only the brightest highlights (lamp, glaze, selection halos) bloom.
+    this.bloomPass = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.28, 0.7, 0.92);
+    this.composer.addPass(this.bloomPass);
     this.composer.addPass(new OutputPass());
     this.composer.addPass(new SMAAPass());
     this.captureBoxes = new CaptureBoxes(
@@ -440,6 +445,8 @@ export class BoardRenderer {
     canvas.removeEventListener("pointercancel", this.onPointerUpBound);
     this.renderer.dispose();
     this.ssaoPass.dispose();
+    this.bloomPass.dispose();
+    this.contactMap?.dispose();
     this.atmospherePass.dispose();
     this.composer.dispose();
     this.woodColorTexture.dispose();
@@ -872,6 +879,25 @@ export class BoardRenderer {
     hoverRing.visible = false;
     group.add(hoverRing);
 
+    // Soft contact shadow on the board; follows the board while the piece lifts.
+    const contact = new THREE.Mesh(
+      new THREE.CircleGeometry(PIECE_RADIUS * 1.45, 32),
+      new THREE.MeshBasicMaterial({
+        color: "#000000",
+        map: this.contactTexture(),
+        transparent: true,
+        opacity: 0.5,
+        depthWrite: false,
+        polygonOffset: true,
+        polygonOffsetFactor: -2,
+        polygonOffsetUnits: -2,
+      }),
+    );
+    contact.rotation.x = -Math.PI / 2;
+    contact.position.y = 0.004;
+    contact.renderOrder = -1;
+    contact.userData.contact = true;
+    group.add(contact);
     // Soft light pooling under the base of every piece the side to move can play.
     const turnGlow = new THREE.Mesh(
       new THREE.CircleGeometry(PIECE_RADIUS * TURN_HALO_REACH, 48),
@@ -1087,6 +1113,24 @@ void main() {
     this.camera.lookAt(target);
   }
 
+  private contactMap: THREE.CanvasTexture | null = null;
+
+  private contactTexture(): THREE.CanvasTexture {
+    if (this.contactMap) return this.contactMap;
+    const size = 64;
+    const canvas = document.createElement("canvas");
+    canvas.width = canvas.height = size;
+    const context = canvas.getContext("2d") as CanvasRenderingContext2D;
+    const gradient = context.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+    gradient.addColorStop(0, "rgba(255,255,255,1)");
+    gradient.addColorStop(0.55, "rgba(255,255,255,0.55)");
+    gradient.addColorStop(1, "rgba(255,255,255,0)");
+    context.fillStyle = gradient;
+    context.fillRect(0, 0, size, size);
+    this.contactMap = new THREE.CanvasTexture(canvas);
+    return this.contactMap;
+  }
+
   private updatePieces(elapsed: number): void {
     for (const animation of [...this.pieceAnimations]) {
       const progress = Math.min(1, (elapsed - animation.start) / animation.duration);
@@ -1139,6 +1183,12 @@ void main() {
       }
       for (const child of group.children) {
         if (!(child instanceof THREE.Mesh)) continue;
+        if (child.userData.contact) {
+          const lift = Math.max(0, group.position.y - this.pieceBaseY());
+          child.position.y = 0.004 - lift;
+          (child.material as THREE.MeshBasicMaterial).opacity = 0.5 * Math.exp(-lift * 5);
+          child.scale.setScalar(1 + lift * 1.6);
+        }
         if (child.userData.selectionRing) {
           child.visible = isSelected;
           (child.material as THREE.MeshBasicMaterial).opacity = isSelected ? 0.86 : 0;
