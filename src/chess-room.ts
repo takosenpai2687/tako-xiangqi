@@ -346,6 +346,7 @@ export class ChessRoom {
   private readonly loader = new FetchTextureLoader();
   private readonly textures = new Set<THREE.Texture>();
   private readonly environment: THREE.WebGLRenderTarget;
+  readonly environmentMap: THREE.Texture;
   private readonly teaMaterial: THREE.MeshPhysicalMaterial;
   private readonly cups: TeaCup[] = [];
   private drink: DrinkState | null = null;
@@ -383,6 +384,10 @@ export class ChessRoom {
     renderer: THREE.WebGLRenderer,
   ) {
     this.environment = roomReflections(renderer);
+    this.environmentMap = this.environment.texture;
+    sourceWood.envMap = this.environmentMap;
+    sourceWood.envMapIntensity = 0.12;
+    sourceWood.needsUpdate = true;
     this.teaMaterial = new THREE.MeshPhysicalMaterial({
       color: "#ffffff",
       vertexColors: true,
@@ -601,15 +606,20 @@ reflectedLight.directSpecular *= ambientOcclusion;
     ];
     for (const material of woods) {
       const sharesAo = material !== this.tableTopMaterial;
+      const envMapIntensity = material === this.saucerMaterial ? 0.18 : 0.1;
       if (
         material.map === source.map &&
         material.normalMap === source.normalMap &&
         material.roughnessMap === source.roughnessMap &&
-        (!sharesAo || material.aoMap === source.aoMap)
+        (!sharesAo || material.aoMap === source.aoMap) &&
+        material.envMap === this.environmentMap &&
+        material.envMapIntensity === envMapIntensity
       ) continue;
       material.map = source.map;
       material.normalMap = source.normalMap;
       material.roughnessMap = source.roughnessMap;
+      material.envMap = this.environmentMap;
+      material.envMapIntensity = envMapIntensity;
       material.normalScale.copy(source.normalScale);
       // The small saucer needs its grain relief exaggerated to read at all.
       if (material === this.saucerMaterial) material.normalScale.multiplyScalar(2.5);

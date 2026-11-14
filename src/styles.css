@@ -489,6 +489,38 @@ button svg {
   gap: 20px;
 }
 
+.view-label {
+  position: relative;
+  color: inherit;
+  font-size: 20px;
+  line-height: 1;
+  white-space: nowrap;
+  transition: text-shadow 220ms ease;
+}
+
+.view-label::after {
+  position: absolute;
+  right: 0;
+  bottom: -7px;
+  left: 0;
+  height: 3px;
+  background: currentcolor;
+  content: "";
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform 280ms cubic-bezier(0.2, 0.75, 0.25, 1);
+}
+
+.view-button:hover .view-label,
+.view-button:focus-visible .view-label {
+  text-shadow: 0 0 9px rgb(243 231 208 / 72%);
+}
+
+.view-button:hover .view-label::after,
+.view-button:focus-visible .view-label::after {
+  transform: scaleX(1);
+}
+
 .hud-button {
   display: inline-flex;
   width: 48px;
@@ -596,8 +628,10 @@ button svg {
 }
 
 .view-button {
-  width: 48px;
+  width: auto;
   height: 48px;
+  gap: 8px;
+  padding: 0 6px;
 }
 
 .view-button svg {
@@ -1025,6 +1059,10 @@ button svg {
     gap: 8px;
   }
 
+  .view-label {
+    font-size: 16px;
+  }
+
   .turn-statuses {
     gap: 8px;
   }
@@ -1035,8 +1073,10 @@ button svg {
   }
 
   .view-button {
-    width: 40px;
+    width: auto;
     height: 40px;
+    gap: 5px;
+    padding: 0 4px;
   }
 
   .view-button svg {

@@ -27,6 +27,7 @@ Play Chinese chess with a friend in a quiet Japanese-style tea room, or challeng
 ### Technology & credits
 
 - Tech stack: Three.js and TypeScript.
+- Graphics: PBR materials, a procedurally generated room reflection map, soft shadows, contact occlusion, SSAO, SMAA, bloom, depth of field, and volumetric lighting.
 - The 3D scene and models were AI-assisted; textures were AI-assisted and prepared for the game.
 - Sound effects were generated with EventLabs.
 - The computer opponent is [Pikafish](https://github.com/official-pikafish/Pikafish) (GPLv3, WebAssembly build running locally in the browser; the NNUE weights are for non-commercial use only).
@@ -58,6 +59,7 @@ Play Chinese chess with a friend in a quiet Japanese-style tea room, or challeng
 ### 技术与制作
 
 - 技术栈：Three.js、TypeScript。
+- 图形学：PBR 材质、程序生成的室内反射、软阴影、接触阴影、SSAO、SMAA 抗锯齿、泛光、景深与体积光。
 - 3D 场景与模型由 AI 辅助构建，贴图由 AI 辅助生成并整理。
 - 音效由 EventLabs 生成。
 - 电脑对手使用 [Pikafish](https://github.com/official-pikafish/Pikafish)（GPLv3，WebAssembly 版，在浏览器本地运行；NNUE 权重仅限非商业用途）。

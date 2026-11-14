@@ -204,6 +204,7 @@ export class BoardRenderer {
   private wasPortrait = false;
   private pendingViewSide: number | null = null;
   private pieceAtlas: THREE.Texture | null = null;
+  private environmentMap!: THREE.Texture;
   private hoveredPiece: ChessPiece | null = null;
   private readonly menuGlyphStrength = new THREE.Uniform(0);
   private readonly pieceGlyphs = new Map<THREE.Group, PieceGlyphGlow>();
@@ -270,6 +271,7 @@ export class BoardRenderer {
     this.buildEnvironment();
     this.buildBoard();
     this.room = new ChessRoom(this.scene, this.boardSurface.material, this.renderer);
+    this.environmentMap = this.room.environmentMap;
     const sceneDepth = this.ssaoPass.normalRenderTarget.depthTexture;
     if (!sceneDepth) throw new Error("Room atmosphere requires the scene depth texture.");
     this.atmospherePass = new RoomAtmospherePass(
@@ -899,7 +901,23 @@ export class BoardRenderer {
       metalness: 0.02,
       clearcoat: 0.12,
       clearcoatRoughness: 0.5,
+      envMap: this.environmentMap,
+      envMapIntensity: 0.22,
     });
+    bodyMaterial.onBeforeCompile = shader => {
+      shader.vertexShader = `varying vec3 vPieceSurfacePosition;\n${shader.vertexShader}`.replace(
+        "#include <begin_vertex>",
+        "#include <begin_vertex>\nvPieceSurfacePosition = transformed;",
+      );
+      shader.fragmentShader = `varying vec3 vPieceSurfacePosition;\n${shader.fragmentShader}`.replace(
+        "#include <roughnessmap_fragment>",
+        `#include <roughnessmap_fragment>
+float pieceSurfaceGrain = sin(vPieceSurfacePosition.x * 31.0 + sin(vPieceSurfacePosition.y * 17.0))
+  * sin(vPieceSurfacePosition.z * 27.0 + vPieceSurfacePosition.y * 9.0);
+roughnessFactor = clamp(roughnessFactor + pieceSurfaceGrain * 0.012, 0.0, 1.0);`,
+      );
+    };
+    bodyMaterial.customProgramCacheKey = () => "piece-body-surface-grain";
     const body = new THREE.Mesh(
       new THREE.LatheGeometry(
         [
@@ -929,6 +947,8 @@ export class BoardRenderer {
         roughness: 0.4,
         metalness: 0.28,
         clearcoat: 0.18,
+        envMap: this.environmentMap,
+        envMapIntensity: 0.32,
       }),
     );
     rim.rotation.x = Math.PI / 2;
