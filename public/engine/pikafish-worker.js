@@ -1,5 +1,5 @@
 // Classic worker hosting the Pikafish WASM engine (pthreads + SIMD, one search thread).
-// Protocol: main -> {type:"init"} | {type:"search", id, fen, options, go}
+// Protocol: main -> {type:"init"} | {type:"search", id, fen, options, go, reset}
 //           worker -> {type:"progress", value} | {type:"ready"} | {type:"error", message}
 //                     | {type:"bestmove", id, move, score}
 // Emscripten spawns its pthread workers from document.currentScript.src, which does not exist
@@ -110,6 +110,7 @@ self.onmessage = event => {
     init(data.dataUrl || LOCAL_DATA_URL, data.wasmUrl || new URL("pikafish.wasm", self.location.href).href);
   } else if (data.type === "search" && engine) {
     pending = { id: data.id };
+    if (data.reset) engine("ucinewgame");
     for (const [name, value] of Object.entries(data.options)) {
       engine(`setoption name ${name} value ${value}`);
     }

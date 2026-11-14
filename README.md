@@ -1,41 +1,30 @@
 # tako-xiangqi
 
-![Xiangqi gameplay](docs/screenshots/game-screenshot.webp)
+## [Play now · 立即游玩](https://tako-xiangqi.netlify.app)
 
-## English
+![Xiangqi gameplay](docs/screenshots/game-screenshot.webp)
 
 Play Chinese chess with a friend in a quiet Japanese-style tea room, or challenge the computer at three difficulty levels. The game keeps the original chess rules.
 
-**Play now:** [https://tako-xiangqi.netlify.app](https://tako-xiangqi.netlify.app)
-
 ### Features
 
-- Choose red (first move) or black (second move) against the computer; the view stays on your side.
-- A realistic 3D board, pieces, and tea room with warm lighting, tea cups, and rising steam.
-- Traditional 馬 and 車 piece lettering, with distinct 炮 (red) and 砲 (black). River labels 楚河 and 汉界 face the red player and appear upside down from the black side.
-- Click or drag pieces to move; legal destinations appear when a piece is selected.
-- Rotate and zoom the view, with a smooth camera turn when players switch sides.
-- Piece selection, movement, captures, and captured-piece storage have animations.
-- Piece lettering gently pulses with light in the main menu.
-- Selected pieces' lettering glows through dragging and movement.
-- Both pieces' lettering briefly lights up during a capture.
-- Distinct red and black move sounds, plus piece pickup, capture, and undo sounds.
-- Undo, restart, and a victory screen.
-- AI games include a hint with its own difficulty setting (one level above the opponent by default, capped at hard). It selects the suggested piece and adds a pulsing red destination ring without hiding legal moves. Selecting another piece or deselecting clears the hint.
-- AI games show an uncalibrated red/black win estimate beside the piece counters, updated after each move using Pikafish evaluations.
-- Click a selected piece again to deselect it.
-- Chinese and English UI: defaults to Chinese for a Chinese browser language, otherwise English. Choose from the main menu; your choice is saved locally and takes priority on future visits. Piece textures remain unchanged.
-- Graphics settings for ambient occlusion, depth of field, anti-aliasing, and volumetric light.
-- Online resources are automatically routed to Alibaba Cloud for mainland China and Netlify for other regions. Local development and localhost previews always use local assets.
+- Local two-player games or three AI difficulty levels, with a choice of red or black.
+- A wooden 3D board in a tea room, with move and capture animations and sound effects.
+- Legal-move highlights, undo, restart, and victory detection including checkmate and stalemate.
+- AI hints with a separate difficulty setting, plus red/black win estimates for reference, not precise predictions.
+- A freely rotatable, zoomable view and interactive tea cups.
+- Chinese and English UI with adjustable graphics settings.
 
 ### Controls
 
-- Select a piece and then a legal destination, or drag the piece to move it.
-- Drag from an empty area to rotate the view; use the mouse wheel to zoom.
-- 🍵 Your move, your tea break. Click your cup on your turn to take a sip—no rush!
-- Use the on-screen controls to undo or restart.
+- **Move:** click a piece, then a highlighted destination, or drag it there. Click the selected piece again to deselect.
+- **Hint:** in AI games, click Hint to select a recommended piece and mark its destination with a pulsing red ring. Use the gear beside it to change hint difficulty; selecting another piece or deselecting clears the hint.
+- **View:** drag an empty area to rotate, scroll to zoom, or use Reset view to return to the default angle.
+- **Undo / Restart:** undo a move or start over. In AI games, undo returns to your previous turn.
+- **Tea:** click your own cup on your turn to take a sip.
+- **Settings:** choose your language and graphics settings from the main menu.
 
-### Credits
+### Technology & credits
 
 - Tech stack: Three.js and TypeScript.
 - The 3D scene and models were AI-assisted; textures were AI-assisted and prepared for the game.
@@ -50,32 +39,23 @@ Play Chinese chess with a friend in a quiet Japanese-style tea room, or challeng
 
 ### 游戏特色
 
-- 人机对战可选择红方或黑方，视角固定在玩家一侧。
-- 写实 3D 棋盘、棋子与和室场景，搭配柔和暖光、茶杯和缓缓升起的热气。
-- 棋子采用「馬」「車」，红方为「炮」、黑方为「砲」；河界「楚河」「汉界」固定朝向红方，黑方视角下倒置，不镜像。
-- 点击或拖动棋子即可走棋，选中时会显示合法落点。
-- 可旋转、缩放棋盘视角，换边时镜头平顺转换。
-- 棋子升起、落子、吃子和提子入盒均有动画反馈。
-- 主菜单中的棋子字样带有柔和的呼吸发光效果。
-- 选中棋子的字样持续微亮，拖动和落子动画期间保持。
-- 吃子时，双方棋子的字样会短暂发光。
-- 红黑双方使用不同的落子音效，并提供选子、吃子和悔棋音效。
-- 支持悔棋、重开与胜局提示。
-- 人机对战支持提示及独立难度设置，默认比对手高一档（最高为困难）；提示会选中推荐棋子，并用红色呼吸光圈标出落点，同时保留全部合法落点。切换棋子或取消选中后退出提示。
-- 人机对战会在棋子计数器旁显示由 Pikafish 局面评分换算的红黑胜率估计，并在每步棋后更新；该估计尚未经过棋力标定。
-- 再次点击已选中的棋子可取消选中。
-- 首次访问跟随浏览器语言：中文环境默认中文，其余默认英文。主菜单可切换语言，本机记住选择，下次访问优先使用；棋子贴图不变。
-- 可调整环境光遮蔽、景深、抗锯齿与体积光。
-- 线上资源按地区自动分流：中国大陆使用阿里云，其他地区使用 Netlify。本地开发及 localhost 预览始终使用本地资源。
+- 本机双人对弈，或挑战三档难度的 AI，自选执红、执黑。
+- 实木风格 3D 棋盘与和室茶室，搭配走子、吃子动画和音效。
+- 合法落点高亮、悔棋、重开，以及包含将死、困毙的胜负判定。
+- 人机模式提供独立难度的走棋提示与红黑胜率估计；胜率仅供参考，并非精确预测。
+- 可自由旋转、缩放视角，还能在思考时喝口茶。
+- 支持中英文切换与画面效果设置。
 
 ### 操作方式
 
-- 点击棋子，再点击合法落点；也可以直接拖动棋子落子。
-- 从棋子以外的位置拖动可旋转视角；滚轮可缩放。
-- 🍵 棋可以慢慢想，茶可别凉了。轮到你时，点点自己的茶杯，先喝一口～
-- 使用界面上的“悔棋”和“重开”进行对应操作。
+- **走棋：**点击棋子，再点击高亮落点，也可直接拖动落子。再次点击已选棋子可取消选中。
+- **提示：**人机模式下点击“提示”，自动选中推荐棋子，并以红色呼吸光圈标出落点。旁边的齿轮可调整提示难度；切换棋子或取消选中即可退出提示。
+- **视角：**拖动空白处旋转，滚轮缩放；点击“恢复视角”回到默认角度。
+- **悔棋 / 重开：**撤回走棋或重新开始；人机模式下悔棋会回到你上一次走棋前。
+- **喝茶：**轮到你时，点击自己的茶杯喝一口。
+- **设置：**在主菜单切换语言、调整画面效果。
 
-### 制作信息
+### 技术与制作
 
 - 技术栈：Three.js、TypeScript。
 - 3D 场景与模型由 AI 辅助构建，贴图由 AI 辅助生成并整理。

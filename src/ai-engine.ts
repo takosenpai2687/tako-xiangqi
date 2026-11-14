@@ -81,13 +81,14 @@ export class AiEngine {
   private worker: Worker | null = null;
   private ready: Promise<void> | null = null;
   private searchId = 0;
+  private resetPending = true;
   private waiting = new Map<number, (result: AiSearchResult | null) => void>();
 
   load(onProgress?: (fraction: number) => void): Promise<void> {
     if (this.ready) return this.ready;
     this.ready = new Promise<void>((resolve, reject) => {
       // Version the worker entry: older deployments marked /engine/* immutable.
-      const worker = new Worker(`${import.meta.env.BASE_URL}engine/pikafish-worker.js?v=3`);
+      const worker = new Worker(`${import.meta.env.BASE_URL}engine/pikafish-worker.js?v=4`);
       this.worker = worker;
       worker.onmessage = event => {
         const data = event.data;
@@ -126,6 +127,11 @@ export class AiEngine {
     return this.run(fen, `go movetime ${time}`);
   }
 
+  reset(): void {
+    // Let any in-flight search finish before clearing the shared engine's history.
+    this.resetPending = true;
+  }
+
   private async run(
     fen: string,
     go: string,
@@ -137,7 +143,9 @@ export class AiEngine {
     const id = ++this.searchId;
     return new Promise<AiSearchResult | null>(resolve => {
       this.waiting.set(id, resolve);
-      worker.postMessage({ type: "search", id, fen, options, go });
+      const reset = this.resetPending;
+      this.resetPending = false;
+      worker.postMessage({ type: "search", id, fen, options, go, reset });
     });
   }
 
@@ -145,6 +153,7 @@ export class AiEngine {
     this.worker?.terminate();
     this.worker = null;
     this.ready = null;
+    this.resetPending = true;
     for (const resolve of this.waiting.values()) resolve(null);
     this.waiting.clear();
   }

@@ -178,6 +178,7 @@ export class GameController {
   undo(): void {
     if (!this.canUndo) return;
     this.cancelAi();
+    this.ai?.engine.reset();
     this.audio.play("undo");
     // Against the AI, undo rewinds to the player's previous turn (two plies).
     const plies = this.ai && this.history.length > 2 && this.turn === this.ai.humanSide ? 2 : 1;
@@ -201,6 +202,7 @@ export class GameController {
 
   newGame(): void {
     this.cancelAi();
+    this.ai?.engine.reset();
     this.board = new Chessboard();
     this.turn = this.rules.sides.red;
     this.selected = null;
@@ -289,6 +291,7 @@ export class GameController {
       to: { row: position.row, col: position.col },
     };
     this.history.push(this.snapshot());
+    if (this.ai && piece.side === this.aiSide) this.ai.engine.reset();
     this.checkWinner();
     if (this.ai && !this.winner) {
       if (piece.side === this.aiSide && score) {
