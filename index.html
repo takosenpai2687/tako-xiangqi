@@ -98,6 +98,19 @@
             </button>
           </div>
           <div class="mode-list" id="level-list" hidden>
+            <div class="side-setting">
+              <span id="ai-side-label" data-i18n="执棋方">执棋方</span>
+              <fieldset class="side-picker" aria-labelledby="ai-side-label">
+                <label>
+                  <input class="sr-only" id="ai-side-red" type="radio" name="ai-side" value="red" checked />
+                  <span data-i18n="红方">红方</span>
+                </label>
+                <label>
+                  <input class="sr-only" id="ai-side-black" type="radio" name="ai-side" value="black" />
+                  <span data-i18n="黑方">黑方</span>
+                </label>
+              </fieldset>
+            </div>
             <button class="mode-button mode-level" data-level="easy" type="button">
               <span data-i18n="简单">简单</span>
               <svg class="mode-arrow" viewBox="0 0 24 24" aria-hidden="true">
@@ -139,7 +152,7 @@
               <span data-i18n="体积光">体积光</span>
               <i class="switch" aria-hidden="true"></i>
             </button>
-            <label class="resource-source" for="resource-source">
+            <label class="resource-source" id="resource-source-setting" for="resource-source">
               <span data-i18n="资源线路">资源线路</span>
               <select id="resource-source">
                 <option value="auto" data-i18n="自动">自动</option>

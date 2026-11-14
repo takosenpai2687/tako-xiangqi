@@ -2,6 +2,9 @@ export type ResourcePreference = "auto" | "cn" | "global";
 
 const OSS_BASE = "https://tako-threejs.oss-cn-shanghai.aliyuncs.com/tako-xiangqi/";
 const STORAGE_KEY = "xiangqi.resource-source";
+export const localResourcesOnly = import.meta.env.DEV
+  || ["localhost", "127.0.0.1", "[::1]", "0.0.0.0"].includes(window.location.hostname)
+  || window.location.hostname.endsWith(".localhost");
 let source: "cn" | "global" = "global";
 
 export function getResourcePreference(): ResourcePreference {
@@ -28,6 +31,10 @@ export function saveResourcePreference(preference: ResourcePreference): boolean 
 }
 
 export async function initializeResourceSource(): Promise<void> {
+  if (localResourcesOnly) {
+    source = "global";
+    return;
+  }
   const preference = getResourcePreference();
   if (preference !== "auto") {
     source = preference;

@@ -3,6 +3,7 @@ export interface TextureManifest {
   boardNormal?: string;
   boardRoughness?: string;
   boardAO?: string;
+  riverLabels?: string;
   pieceAtlas?: string;
   pieces: Partial<Record<`${"red" | "black"}-${string}`, string>>;
 }
@@ -10,7 +11,8 @@ export interface TextureManifest {
 // Textures ship as WebP. Convert lossless masters with tools/compress-textures.py.
 export const textureManifest: TextureManifest = {
   board: "./textures/board-walnut-albedo.webp",
-  pieceAtlas: "./textures/xiangqi-pieces-atlas.webp",
+  pieceAtlas: "./textures/xiangqi-pieces-atlas.webp?v=2",
+  riverLabels: "./textures/river-labels.webp",
   boardNormal: "./textures/board-walnut-normal.webp",
   boardRoughness: "./textures/board-walnut-roughness.webp",
   boardAO: "./textures/board-walnut-ao.webp",

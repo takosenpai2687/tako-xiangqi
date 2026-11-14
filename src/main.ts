@@ -5,7 +5,7 @@ import { AiEngine, type AiLevel } from "./ai-engine";
 import { saveQuality, type QualitySettings } from "./quality";
 import { constants } from "./rules";
 import { applyTranslations, language, setLanguage, t, type Message } from "./i18n";
-import { getResourcePreference, initializeResourceSource, saveResourcePreference } from "./resource-source";
+import { getResourcePreference, initializeResourceSource, localResourcesOnly, saveResourcePreference } from "./resource-source";
 import "./styles.css";
 
 applyTranslations();
@@ -171,11 +171,11 @@ function describeState(state: GameState): void {
   blackPlayer.classList.toggle("is-active", state.started && !redTurn);
   redPlayer.setAttribute("aria-label", t(redTurn ? "红方行棋" : "红方等待"));
   blackPlayer.setAttribute("aria-label", t(redTurn ? "黑方等待" : "黑方行棋"));
-  undoButton.disabled = state.moveCount === 0;
+  undoButton.disabled = !state.canUndo;
   updateRoster("red", state.aliveRed);
   updateRoster("black", state.aliveBlack);
-  // The seat at the bottom of the screen is the side to move; against the AI it is always the human (red).
-  const redBottom = state.vsAi || redTurn;
+  // Keep the human at the bottom against the AI; local play follows the turn.
+  const redBottom = state.humanSide === null ? redTurn : state.humanSide === sides.red;
   redPlayer.style.order = redBottom ? "1" : "0";
   blackPlayer.style.order = redBottom ? "0" : "1";
   selectionNote.hidden = !state.selected && !state.thinking;
@@ -247,6 +247,7 @@ function syncQualityButtons(): void {
 }
 async function startAiGame(level: AiLevel): Promise<void> {
   if (engineBusy) return;
+  const humanSide = requireElement<HTMLInputElement>("ai-side-black").checked ? sides.black : sides.red;
   engineBusy = true;
   engineError.hidden = true;
   levelList.hidden = true;
@@ -258,7 +259,7 @@ async function startAiGame(level: AiLevel): Promise<void> {
       engineLoadingPercent.textContent = `${value}%`;
     });
     setScreenTitle("ai");
-    game?.setAi({ engine, level });
+    game?.setAi({ engine, level, humanSide });
     game?.newGame();
     game?.start();
     renderer?.setMenuMode(false);
@@ -296,7 +297,7 @@ function restartGame(): void {
 
 async function initializeGame(): Promise<void> {
   try {
-    showLoadingMessage("正在选择资源线路…");
+    showLoadingMessage(localResourcesOnly ? "棋局正在展开…" : "正在选择资源线路…");
     await initializeResourceSource();
     showLoadingMessage("棋局正在展开…");
     renderer = new BoardRenderer(viewport, canvas);
@@ -373,7 +374,9 @@ for (const button of document.querySelectorAll<HTMLButtonElement>("[data-languag
 }
 refreshLanguage();
 
-resourceSource.value = getResourcePreference();
+requireElement<HTMLElement>("resource-source-setting").hidden = localResourcesOnly;
+resourceSource.disabled = localResourcesOnly;
+resourceSource.value = localResourcesOnly ? "auto" : getResourcePreference();
 resourceSource.addEventListener("change", () => {
   const preference = resourceSource.value;
   if (preference !== "auto" && preference !== "cn" && preference !== "global") return;

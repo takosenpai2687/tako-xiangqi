@@ -266,6 +266,7 @@ button svg {
 }
 
 .mode-list[hidden],
+.resource-source[hidden],
 .engine-loading[hidden],
 .engine-error[hidden] {
   display: none;
@@ -274,6 +275,79 @@ button svg {
 .mode-list {
   display: grid;
   gap: 12px;
+}
+
+.side-setting {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.side-setting > span {
+  flex-shrink: 0;
+}
+
+.side-picker {
+  position: relative;
+  display: grid;
+  flex: 1;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+  min-width: 0;
+  margin: 0;
+  padding: 4px;
+  border: 0;
+  border-radius: 4px 14px 4px 14px;
+  background: var(--panel);
+}
+
+.side-picker::before {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  left: 4px;
+  width: calc(50% - 6px);
+  border-radius: 2px 10px 2px 10px;
+  background: var(--accent);
+  content: "";
+  pointer-events: none;
+  transition: transform 220ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+.side-picker:has(input[value="black"]:checked)::before {
+  transform: translateX(calc(100% + 4px));
+}
+
+.side-picker label {
+  position: relative;
+  cursor: pointer;
+}
+
+.side-picker span {
+  display: grid;
+  min-height: 44px;
+  padding: 8px;
+  place-items: center;
+  border-radius: 2px 10px 2px 10px;
+  color: var(--muted);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.side-picker input:checked + span {
+  color: var(--ground);
+}
+
+.side-picker:has(input:focus-visible) {
+  outline: 3px solid var(--accent);
+  outline-offset: 4px;
+}
+
+.side-picker label:hover input:not(:checked) + span {
+  color: var(--ink);
 }
 
 .mode-button {

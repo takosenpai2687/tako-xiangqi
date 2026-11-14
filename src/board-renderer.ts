@@ -66,6 +66,11 @@ interface PieceAnimation {
   to: THREE.Vector3;
 }
 
+interface PieceGlyphGlow {
+  strength: THREE.Uniform<number>;
+  captureStart: number | null;
+}
+
 interface CameraTransition {
   start: number;
   duration: number;
@@ -180,6 +185,7 @@ export class BoardRenderer {
   private readonly woodColorTexture: THREE.Texture;
   private readonly woodBumpTexture: THREE.Texture;
   private readonly moveMarkers = new THREE.Group();
+  private readonly riverLabels = new THREE.Group();
   private readonly boardSurface = new THREE.Mesh(
     new THREE.PlaneGeometry(BOARD_WIDTH + 0.25, BOARD_DEPTH + 0.25),
     new THREE.MeshStandardMaterial({
@@ -198,6 +204,8 @@ export class BoardRenderer {
   private pendingViewSide: number | null = null;
   private pieceAtlas: THREE.Texture | null = null;
   private hoveredPiece: ChessPiece | null = null;
+  private readonly menuGlyphStrength = new THREE.Uniform(0);
+  private readonly pieceGlyphs = new Map<THREE.Group, PieceGlyphGlow>();
   private viewSide: number | null = null;
   private menuMode = true;
   private frameId = 0;
@@ -311,6 +319,7 @@ export class BoardRenderer {
 
   setMenuMode(active: boolean): void {
     this.menuMode = active;
+    if (!active) this.menuGlyphStrength.value = 0;
     this.controls.enabled = !active && !this.cameraTransition && !this.captureBoxes.isAnimating;
     if (active) {
       this.setViewForTurn(constants.sides.red);
@@ -324,6 +333,7 @@ export class BoardRenderer {
     move?: MoveRecord,
     turnPieces: readonly ChessPiece[] = [],
   ): void {
+    const capturedGroup = move?.captured ? this.pieceMeshes.get(move.captured) : undefined;
     const activePieces = new Set<ChessPiece>();
     for (const row of state) {
       for (const piece of row) {
@@ -337,6 +347,10 @@ export class BoardRenderer {
     if (freshBoard) this.captureBoxes.reset();
     else this.captureBoxes.reconcile(activePieces);
     if (!move) {
+      for (const glow of this.pieceGlyphs.values()) {
+        glow.captureStart = null;
+        glow.strength.value = 0;
+      }
       this.captureBoxes.finish();
       this.pendingViewSide = null;
       // Selecting a piece re-syncs mid-drag; the camera stays locked while one is held.
@@ -379,6 +393,13 @@ export class BoardRenderer {
           this.pieceBaseY(),
           this.worldZ(piece.row),
         );
+      }
+    }
+
+    if (move?.captured && !this.reducedMotion.matches) {
+      for (const group of [this.pieceMeshes.get(move.piece), capturedGroup]) {
+        const glow = group && this.pieceGlyphs.get(group);
+        if (glow) glow.captureStart = this.now.elapsedTime;
       }
     }
 
@@ -464,6 +485,12 @@ export class BoardRenderer {
     this.woodColorTexture.dispose();
     this.woodBumpTexture.dispose();
     this.pieceAtlas?.dispose();
+    for (const label of this.riverLabels.children) {
+      if (label instanceof THREE.Mesh && label.material instanceof THREE.MeshBasicMaterial) {
+        label.material.map?.dispose();
+      }
+    }
+    this.disposeGroup(this.riverLabels);
     const boardMaterial = this.boardSurface.material as THREE.MeshPhysicalMaterial;
     for (const texture of [
       boardMaterial.map,
@@ -559,6 +586,46 @@ export class BoardRenderer {
     this.loadBoardTextures();
     this.buildGrid();
     this.buildStarPoints();
+    this.buildRiverLabels();
+  }
+
+  private buildRiverLabels(): void {
+    const url = textureManifest.riverLabels;
+    if (!url) return;
+    this.scene.add(this.riverLabels);
+    new FetchTextureLoader().load(
+      url,
+      texture => {
+        texture.colorSpace = THREE.SRGBColorSpace;
+        texture.anisotropy = 8;
+        for (let index = 0; index < 2; index++) {
+          const map = index === 0 ? texture : texture.clone();
+          map.repeat.set(0.5, 1);
+          map.offset.set(index * 0.5, 0);
+          map.needsUpdate = true;
+          const label = new THREE.Mesh(
+            new THREE.PlaneGeometry(1.6, 0.8),
+            new THREE.MeshBasicMaterial({
+              map,
+              transparent: true,
+              opacity: 0.6,
+              depthWrite: false,
+              toneMapped: false,
+              polygonOffset: true,
+              polygonOffsetFactor: -1,
+              polygonOffsetUnits: -1,
+            }),
+          );
+          label.name = index === 0 ? "river-chu-he" : "river-han-jie";
+          // Plane top points toward black, so the lettering reads from red's seat.
+          label.rotation.x = -Math.PI / 2;
+          label.position.set(index === 0 ? -2 : 2, BOARD_TOP + 0.008, 0);
+          this.riverLabels.add(label);
+        }
+      },
+      undefined,
+      error => console.error(`无法载入河界文字贴图 ${url}:`, error),
+    );
   }
 
   private loadBoardTextures(): void {
@@ -845,6 +912,34 @@ export class BoardRenderer {
       roughness: 0.76,
       metalness: 0,
     });
+    const glyphGlow: PieceGlyphGlow = {
+      strength: new THREE.Uniform(0),
+      captureStart: null,
+    };
+    this.pieceGlyphs.set(group, glyphGlow);
+    faceMaterial.onBeforeCompile = shader => {
+      shader.uniforms.uMenuGlyphStrength = this.menuGlyphStrength;
+      shader.uniforms.uPieceGlyphStrength = glyphGlow.strength;
+      shader.uniforms.uGlyphColor = new THREE.Uniform(
+        new THREE.Color(isRed ? "#ff3624" : "#9da8ad").multiplyScalar(isRed ? 1 : 0.65),
+      );
+      shader.fragmentShader = `
+uniform float uMenuGlyphStrength;
+uniform float uPieceGlyphStrength;
+uniform vec3 uGlyphColor;
+${shader.fragmentShader}`.replace(
+        "#include <emissivemap_fragment>",
+        `#include <emissivemap_fragment>
+#ifdef USE_MAP
+  // Isolate the existing ink from the wood without another texture or draw call.
+  float inkMask = ${isRed
+    ? "smoothstep(0.72, 0.88, (diffuseColor.r - max(diffuseColor.g, diffuseColor.b)) / max(diffuseColor.r, 0.001))"
+    : "1.0 - smoothstep(0.006, 0.025, max(diffuseColor.r, max(diffuseColor.g, diffuseColor.b)))"};
+  totalEmissiveRadiance += uGlyphColor * inkMask * max(uMenuGlyphStrength, uPieceGlyphStrength);
+#endif`,
+      );
+    };
+    faceMaterial.customProgramCacheKey = () => `piece-glyph-${side}`;
     const face = new THREE.Mesh(
       new THREE.CircleGeometry(PIECE_RADIUS * 0.77, 64),
       faceMaterial,
@@ -1215,6 +1310,21 @@ void main() {
   }
 
   private updateSelection(elapsed: number): void {
+    const menuBreath = 0.5 - 0.5 * Math.cos(elapsed * Math.PI / 3);
+    this.menuGlyphStrength.value = this.menuMode && !this.reducedMotion.matches
+      ? 4.5 * menuBreath * menuBreath
+      : 0;
+    for (const glow of this.pieceGlyphs.values()) {
+      glow.strength.value = 0;
+      if (glow.captureStart === null) continue;
+      const progress = THREE.MathUtils.clamp(elapsed - glow.captureStart, 0, 1);
+      if (this.reducedMotion.matches || progress >= 1) {
+        glow.captureStart = null;
+        glow.strength.value = 0;
+      } else {
+        glow.strength.value = 4.5 * Math.sin(progress * Math.PI) ** 2;
+      }
+    }
     const float = 0.075 + Math.sin(elapsed * 2.4) * 0.025;
     const pulse = 0.55 + Math.sin(elapsed * 3.2) * 0.22;
     for (const [piece, group] of this.pieceMeshes) {
@@ -1225,6 +1335,10 @@ void main() {
         pointerStart && pointerStart.piece === piece && pointerStart.dragged,
       );
       const animating = [...this.pieceAnimations].some(item => item.group === group);
+      const glyphGlow = this.pieceGlyphs.get(group);
+      if (glyphGlow && !this.menuMode && (isSelected || isDragged || animating)) {
+        glyphGlow.strength.value = Math.max(glyphGlow.strength.value, 2.8);
+      }
       if (!animating && !isDragged) {
         group.position.y = this.pieceBaseY() + (isSelected ? float : 0);
       }
@@ -1262,6 +1376,7 @@ void main() {
   }
 
   private disposeGroup(group: THREE.Group): void {
+    this.pieceGlyphs.delete(group);
     group.traverse(object => {
       if (!(object instanceof THREE.Mesh)) return;
       this.disposeMesh(object);
