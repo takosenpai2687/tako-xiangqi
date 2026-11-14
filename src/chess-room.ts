@@ -338,6 +338,8 @@ export class ChessRoom {
     new THREE.Vector3(ROOM_HALF_X, CEILING_Y, ROOM_HALF_Z),
   );
   private readonly walls: RoomWall[] = [];
+  private readonly table = new THREE.Group();
+  private portrait = false;
   private readonly corners: { post: THREE.Mesh; walls: [RoomWall, RoomWall] }[] = [];
   private readonly ceiling = new THREE.Group();
   private readonly steamTime = new THREE.Uniform(0);
@@ -480,6 +482,17 @@ reflectedLight.directSpecular *= ambientOcclusion;
 
   get isDrinking(): boolean {
     return this.drink !== null;
+  }
+
+  setPortrait(portrait: boolean): void {
+    if (this.portrait === portrait) return;
+    this.portrait = portrait;
+    const angle = portrait ? Math.PI / 2 : 0;
+    this.table.rotation.y = angle;
+    for (const [index, cup] of this.cups.entries()) {
+      cup.origin.copy(CUP_POSITIONS[index]).applyAxisAngle(new THREE.Vector3(0, 1, 0), angle);
+      cup.group.position.copy(cup.origin);
+    }
   }
 
   setActiveSide(side: TeaSide | null): void {
@@ -790,6 +803,7 @@ reflectedLight.directSpecular *= ambientOcclusion;
   }
 
   private buildTable(): void {
+    this.group.add(this.table);
     const bevel = 0.14;
     const depth = 0.36;
     const geometry = new THREE.ExtrudeGeometry(
@@ -820,13 +834,13 @@ reflectedLight.directSpecular *= ambientOcclusion;
     top.rotation.x = -Math.PI / 2;
     top.position.y = -(depth + bevel);
     top.castShadow = top.receiveShadow = true;
-    this.group.add(top);
+    this.table.add(top);
 
     const underside = -(depth + bevel * 2);
     const apronHeight = 0.54;
     const legHeight = underside - FLOOR_Y;
     const base = (width: number, height: number, length: number, x: number, y: number, z: number, radius: number) => {
-      const mesh = this.timber(this.group, width, height, length, x, y, z, radius, this.tableBaseMaterial);
+      const mesh = this.timber(this.table, width, height, length, x, y, z, radius, this.tableBaseMaterial);
       // Darken toward the joint under the tabletop.
       shadeByHeight(mesh.geometry, height / 2 - 0.7, height / 2, 1, 0.42);
       mesh.castShadow = true;

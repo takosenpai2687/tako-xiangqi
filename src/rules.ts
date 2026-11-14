@@ -160,6 +160,7 @@ class Elephant extends Chess {
     return ([[-2, -2], [-2, 2], [2, -2], [2, 2]] as const)
       .map(([dr, dc]) => ({ row: this.row + dr, col: this.col + dc }))
       .filter(p => p.col >= 0 && p.col <= 8 && p.row >= top && p.row <= bottom
+        && !state[(this.row + p.row) / 2][(this.col + p.col) / 2]
         && this.isOpenFor(state, p.row, p.col));
   }
 }

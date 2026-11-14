@@ -4,15 +4,17 @@
 
 ![Xiangqi gameplay](docs/screenshots/game-screenshot.webp)
 
-Play Chinese chess with a friend in a quiet Japanese-style tea room, or challenge the computer at three difficulty levels. The game keeps the original chess rules.
+Play Chinese chess with a friend in a quiet Japanese-style tea room, or challenge the computer at three difficulty levels.
 
 ### Features
 
 - Local two-player games or three AI difficulty levels, with a choice of red or black.
 - A wooden 3D board in a tea room, with move and capture animations and sound effects.
 - Legal-move highlights, undo, restart, and victory detection including checkmate and stalemate.
+- Repetition, perpetual check or chase, and move-count draws are not adjudicated.
 - AI hints with a separate difficulty setting, plus red/black win estimates for reference, not precise predictions.
 - A freely rotatable, zoomable view and interactive tea cups.
+- Portrait screens use a steeper overview with captured pieces in boxes in front of each player.
 - Chinese and English UI with adjustable graphics settings.
 
 ### Controls
@@ -36,15 +38,17 @@ Play Chinese chess with a friend in a quiet Japanese-style tea room, or challeng
 
 **立即游玩：** [https://tako-xiangqi.netlify.app](https://tako-xiangqi.netlify.app)
 
-在静谧的和室棋室中，和朋友来一局中国象棋，或挑战三档难度的电脑对手。沿用原有象棋规则。
+在静谧的和室棋室中，和朋友来一局中国象棋，或挑战三档难度的电脑对手。
 
 ### 游戏特色
 
 - 本机双人对弈，或挑战三档难度的 AI，自选执红、执黑。
 - 实木风格 3D 棋盘与和室茶室，搭配走子、吃子动画和音效。
 - 合法落点高亮、悔棋、重开，以及包含将死、困毙的胜负判定。
+- 暂不判定重复局面、长将长捉和自然限着和棋。
 - 人机模式提供独立难度的走棋提示与红黑胜率估计；胜率仅供参考，并非精确预测。
 - 可自由旋转、缩放视角，还能在思考时喝口茶。
+- 竖屏采用更俯视的视角，提子盒横放在各自玩家面前。
 - 支持中英文切换与画面效果设置。
 
 ### 操作方式

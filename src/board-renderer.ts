@@ -33,6 +33,7 @@ const FIXED_FIT_TOP = 0.9;
 const FIXED_FIT_MARGIN = 0.96;
 // Camera direction of the fixed overview (red side); steeper means closer to top-down.
 const FIXED_VIEW_DIRECTION = new THREE.Vector3(0, 13, 8.2).normalize();
+const PORTRAIT_VIEW_DIRECTION = new THREE.Vector3(0, 13, 5.4).normalize();
 const BOARD_DEPTH = 9;
 const BOARD_TOP = 0.53;
 const PIECE_RADIUS = 0.39;
@@ -457,12 +458,15 @@ export class BoardRenderer {
   }
 
   // Fixed oblique overview for each side. The distance is solved from the real projection:
-  // the closest camera position that keeps the whole board (plus margin) inside the viewport,
-  // so the board is as large as possible in both portrait and landscape.
+  // Keep the board in view, together with the capture boxes in portrait.
   private fixedOffset(side: number): THREE.Vector3 {
-    const base = FIXED_VIEW_DIRECTION.clone().multiplyScalar(this.fitDistance());
+    const base = this.fixedDirection().clone().multiplyScalar(this.fitDistance());
     if (side !== constants.sides.red) base.z = -base.z;
     return base;
+  }
+
+  private fixedDirection(): THREE.Vector3 {
+    return this.camera.aspect < 1 ? PORTRAIT_VIEW_DIRECTION : FIXED_VIEW_DIRECTION;
   }
 
   private fitDistance(): number {
@@ -474,8 +478,15 @@ export class BoardRenderer {
         for (const y of [0, FIXED_FIT_TOP]) corners.push(new THREE.Vector3(x, BOARD_TOP + y, z));
       }
     }
+    if (this.camera.aspect < 1) {
+      for (const x of [-2.7, 2.7]) {
+        for (const z of [-8.32, 8.32]) {
+          corners.push(new THREE.Vector3(x, 0.49, z));
+        }
+      }
+    }
     const fits = (distance: number): boolean => {
-      probe.position.copy(target).addScaledVector(FIXED_VIEW_DIRECTION, distance);
+      probe.position.copy(target).addScaledVector(this.fixedDirection(), distance);
       probe.lookAt(target);
       probe.updateMatrixWorld(true);
       probe.updateProjectionMatrix();
@@ -1603,13 +1614,13 @@ void main() {
     const minDistance = fit * 0.6;
     this.controls.maxDistance = Math.max(48, fit * 1.6);
     const portrait = this.camera.aspect < 1;
+    this.captureBoxes.setPortrait(portrait);
+    this.room.setPortrait(portrait);
     const orientationChanged = portrait !== this.wasPortrait;
     this.wasPortrait = portrait;
     if (orientationChanged && !this.menuMode) {
       // Switching portrait/landscape glides back to the fixed overview for the new layout.
-      this.beginCameraTransition(
-        this.fixedOffset(this.viewSide ?? constants.sides.red),
-      );
+      this.setViewForTurn(this.pendingViewSide ?? this.viewSide ?? constants.sides.red, true);
       return;
     }
     const offset = this.camera.position.clone().sub(this.controls.target);

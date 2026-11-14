@@ -13,10 +13,12 @@ const SLOT_ROWS = [-0.5, 0.5, -1.5, 1.5, -2.5, 2.5];
 const CAPTURE_DURATION = 1.65;
 const IMPACT_DURATION = 0.28;
 const TRAIL_POINTS = 8;
+const PORTRAIT_BOX_Z = 6.85;
 
 interface CaptureBox {
   group: THREE.Group;
   home: THREE.Vector3;
+  homeAngle: number;
   rim: THREE.Mesh<THREE.ShapeGeometry, THREE.MeshBasicMaterial>;
   impactStart: number | null;
 }
@@ -65,6 +67,8 @@ export class CaptureBoxes {
   private readonly boxes = new Map<number, CaptureBox>();
   private readonly animations = new Set<CaptureAnimation>();
   private readonly stored = new Map<ChessPiece, StoredPiece>();
+  private readonly sides: { red: number; black: number };
+  private portrait = false;
 
   constructor(
     private readonly scene: THREE.Scene,
@@ -72,8 +76,22 @@ export class CaptureBoxes {
     sides: { red: number; black: number },
     private readonly disposePiece: (group: THREE.Group) => void,
   ) {
+    this.sides = sides;
     this.boxes.set(sides.black, this.createBox(-6.35, "#151c19"));
     this.boxes.set(sides.red, this.createBox(6.35, "#bd4534"));
+  }
+
+  setPortrait(portrait: boolean): void {
+    if (this.portrait === portrait) return;
+    this.portrait = portrait;
+    for (const [side, box] of this.boxes) {
+      const red = side === this.sides.red;
+      box.home.set(portrait ? 0 : red ? 6.35 : -6.35, 0, portrait ? (red ? PORTRAIT_BOX_Z : -PORTRAIT_BOX_Z) : 0);
+      box.homeAngle = portrait ? Math.PI / 2 : 0;
+      box.group.position.copy(box.home);
+      box.group.rotation.set(0, box.homeAngle, 0);
+    }
+    for (const animation of this.animations) this.retargetAnimation(animation);
   }
 
   get isAnimating(): boolean {
@@ -90,7 +108,7 @@ export class CaptureBoxes {
 
   faceView(angle: number): void {
     for (const entry of this.stored.values()) {
-      if (entry.group.parent === entry.box.group) entry.group.rotation.y = angle;
+      if (entry.group.parent === entry.box.group) entry.group.rotation.y = angle - entry.box.group.rotation.y;
     }
   }
 
@@ -142,7 +160,7 @@ export class CaptureBoxes {
 
     const from = group.position.clone();
     const lift = from.clone().add(new THREE.Vector3(0, 0.85, 0));
-    const landing = box.home.clone().add(this.slotPosition(slot));
+    const landing = this.worldSlotPosition(entry);
     const mouth = landing.clone();
     mouth.y = BOX_RIM_Y + 0.65;
     const firstControl = lift.clone().lerp(mouth, 0.3);
@@ -274,7 +292,7 @@ export class CaptureBoxes {
     for (const box of this.boxes.values()) {
       box.impactStart = null;
       box.group.position.copy(box.home);
-      box.group.rotation.set(0, 0, 0);
+      box.group.rotation.set(0, box.homeAngle, 0);
       box.rim.visible = false;
       box.rim.material.opacity = 0;
     }
@@ -373,7 +391,24 @@ export class CaptureBoxes {
     rim.visible = false;
     group.add(rim);
     this.scene.add(group);
-    return { group, home: group.position.clone(), rim, impactStart: null };
+    return { group, home: group.position.clone(), homeAngle: 0, rim, impactStart: null };
+  }
+
+  private worldSlotPosition(entry: StoredPiece): THREE.Vector3 {
+    return this.slotPosition(entry.slot)
+      .applyAxisAngle(new THREE.Vector3(0, 1, 0), entry.box.homeAngle)
+      .add(entry.box.home);
+  }
+
+  private retargetAnimation(animation: CaptureAnimation): void {
+    animation.landing.copy(this.worldSlotPosition(animation.entry));
+    animation.mouth.copy(animation.landing);
+    animation.mouth.y = BOX_RIM_Y + 0.65;
+    const firstControl = animation.lift.clone().lerp(animation.mouth, 0.3);
+    const secondControl = animation.lift.clone().lerp(animation.mouth, 0.75);
+    firstControl.y = Math.max(animation.lift.y, animation.mouth.y) + 0.75;
+    secondControl.y = firstControl.y;
+    animation.curve = new THREE.CubicBezierCurve3(animation.lift, firstControl, secondControl, animation.mouth);
   }
 
   private slotPosition(slot: number): THREE.Vector3 {
