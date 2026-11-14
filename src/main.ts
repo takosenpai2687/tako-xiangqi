@@ -82,7 +82,7 @@ const loadingStartedAt = performance.now();
 function setLoadingProgress(progress: number): void {
   const value = Math.max(0, Math.min(100, Math.floor(progress)));
   loadingMeter.setAttribute("aria-valuenow", String(value));
-  loadingMeterFill.style.width = `${value}%`;
+  loadingMeterFill.style.setProperty("--progress", String(value));
   loadingPercent.textContent = `${value}%`;
 }
 

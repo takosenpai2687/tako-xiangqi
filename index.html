@@ -36,26 +36,23 @@
       ></iframe>
     </noscript>
     <div class="loading-screen" id="loading-screen">
-      <div class="loading-content">
-        <span class="loading-seal" aria-hidden="true">帅</span>
-        <h1 class="loading-title">棋局正在展开</h1>
-        <div
-          class="loading-meter"
-          id="loading-meter"
-          role="progressbar"
-          aria-label="页面资源加载进度"
-          aria-valuemin="0"
-          aria-valuemax="100"
-          aria-valuenow="0"
-        >
-          <div class="loading-meter-fill" id="loading-meter-fill">
-            <span class="loading-piece" aria-hidden="true">兵</span>
+      <div
+        class="loading-content"
+        id="loading-meter"
+        role="progressbar"
+        aria-label="页面资源加载进度"
+        aria-valuemin="0"
+        aria-valuemax="100"
+        aria-valuenow="0"
+      >
+        <div class="loading-cup" aria-hidden="true">
+          <div class="loading-bowl">
+            <div class="loading-water" id="loading-meter-fill"></div>
           </div>
+          <span class="loading-foot"></span>
         </div>
-        <div class="loading-caption">
-          <span id="loading-status" role="status" aria-live="polite">棋子正在入阵…</span>
-          <span id="loading-percent">0%</span>
-        </div>
+        <span class="loading-percent" id="loading-percent" aria-hidden="true">0%</span>
+        <span class="loading-status" id="loading-status" role="status" aria-live="polite">棋局正在展开…</span>
       </div>
     </div>
     <div class="app-shell">
