@@ -177,6 +177,7 @@ export class BoardRenderer {
   private readonly reducedMotion = window.matchMedia(
     "(prefers-reduced-motion: reduce)",
   );
+  private readonly touchDevice = window.matchMedia("(pointer: coarse)");
   private readonly groundPlane = new THREE.Plane(
     new THREE.Vector3(0, 1, 0),
     -BOARD_TOP,
@@ -1085,7 +1086,10 @@ ${shader.fragmentShader}`.replace(
       new THREE.CircleGeometry(PIECE_RADIUS * TURN_HALO_REACH, 48),
       new THREE.ShaderMaterial({
         name: "TurnHalo",
-        uniforms: { uStrength: new THREE.Uniform(0) },
+        uniforms: {
+          uStrength: new THREE.Uniform(0),
+          uReach: new THREE.Uniform(TURN_HALO_REACH),
+        },
         vertexShader: `
 varying vec2 vUv;
 void main() {
@@ -1094,10 +1098,11 @@ void main() {
 }`,
         fragmentShader: `
 uniform float uStrength;
+uniform float uReach;
 varying vec2 vUv;
 void main() {
-  float radius = length(vUv - 0.5) * 2.0;
-  float falloff = 1.0 - smoothstep(${(0.9 / TURN_HALO_REACH).toFixed(3)}, 1.0, radius);
+  float radius = length(vUv - 0.5) * 2.0 * uReach;
+  float falloff = 1.0 - smoothstep(0.9, uReach, radius);
   gl_FragColor = vec4(vec3(1.0, 0.78, 0.42), falloff * falloff * uStrength);
 }`,
         transparent: true,
@@ -1432,12 +1437,17 @@ void main() {
         }
         if (child.userData.turnGlow) {
           child.visible = this.turnPieces.has(piece) && !isSelected;
+          const strengthScale = this.touchDevice.matches ? 0.5 : 1;
+          // Halve the spill outside the piece, not the radius hidden beneath it.
+          const reach = 1 + (TURN_HALO_REACH - 1) * strengthScale;
+          child.scale.setScalar(reach / TURN_HALO_REACH);
+          (child.material as THREE.ShaderMaterial).uniforms.uReach.value = reach;
           // Slow breathing that drifts across the board; steady when motion is reduced.
           const breath = this.reducedMotion.matches
             ? 0.5
             : 0.5 + 0.5 * Math.sin(elapsed * 2.2 - (piece.col + piece.row) * 0.4);
           (child.material as THREE.ShaderMaterial).uniforms.uStrength.value =
-            0.09 + 0.25 * breath;
+            (0.09 + 0.25 * breath) * strengthScale;
         }
       }
     }
