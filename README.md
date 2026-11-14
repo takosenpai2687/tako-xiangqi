@@ -1,6 +1,6 @@
 # tako-xiangqi
 
-![中国象棋游戏画面](docs/screenshots/game.png)
+![中国象棋游戏画面](docs/screenshots/game.webp)
 
 **立即游玩：** [https://tako-xiangqi.netlify.app](https://tako-xiangqi.netlify.app)
 
