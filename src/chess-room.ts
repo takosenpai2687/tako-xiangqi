@@ -25,6 +25,44 @@ const CUP_POSITIONS = [
   new THREE.Vector3(7.55, 0, -3.6),
 ];
 
+interface TeaCup {
+  side: TeaSide;
+  group: THREE.Group;
+  vessel: THREE.Group;
+  tea: THREE.Mesh;
+  staticTea: THREE.BufferGeometry;
+  liquid: THREE.BufferGeometry;
+  material: THREE.MeshPhysicalMaterial;
+  steam: THREE.Points;
+  origin: THREE.Vector3;
+  hovered: boolean;
+}
+
+interface DrinkState {
+  cup: TeaCup;
+  start: number | null;
+  lifted: boolean;
+  sipped: boolean;
+  placed: boolean;
+}
+
+export type TeaSide = "red" | "black";
+export type TeaSound = "lift" | "sip" | "place";
+
+const DRINK_DURATION = 3.2;
+const GLOW_PERIOD = 1.8;
+const GLOW_MIN = 0.1;
+const GLOW_MAX = 0.3;
+const HOLD_SCREEN_FRACTION = 0.42;
+const HOLD_EXTENT = 1.4;
+const HOLD_TILT = 1.15;
+const CUP_BASE = 0.045;
+const CUP_CENTER = new THREE.Vector3(0, 0.45, 0);
+const LIQUID_DROP = 0.2;
+
+const easeOutCubic = (value: number): number => 1 - (1 - THREE.MathUtils.clamp(value, 0, 1)) ** 3;
+const segment = (time: number, from: number, to: number): number => easeOutCubic((time - from) / (to - from));
+
 interface RoomWall {
   group: THREE.Group;
   outward: THREE.Vector3;
@@ -128,6 +166,120 @@ function shadeByHeight(
   geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
 }
 
+const TEA_DEEP = new THREE.Color("#a7ba4b");
+const TEA_SHALLOW = new THREE.Color("#e3e69f");
+const TEA_RIM = new THREE.Color("#fffde0");
+
+function teaShade(radius: number): THREE.Color {
+  return TEA_DEEP.clone()
+    .lerp(TEA_SHALLOW, THREE.MathUtils.smoothstep(radius, 0.12, 0.47))
+    .lerp(TEA_RIM, THREE.MathUtils.smoothstep(radius, 0.485, 0.53));
+}
+
+// Inside of the cup as (height, radius), used to cut the liquid surface to the glaze.
+const CUP_INSIDE = [
+  [0.112, 0], [0.118, 0.18], [0.15, 0.34], [0.225, 0.44], [0.34, 0.494], [0.47, 0.513],
+  [0.6, 0.518], [0.72, 0.53], [0.81, 0.548], [0.885, 0.564], [0.9, 0.568],
+];
+const CUP_MOUTH = 0.89;
+const CUP_RIM_RADIUS = 0.585;
+const LIQUID_INSET = 0.012;
+const LIQUID_RINGS = [0.4, 0.75, 0.92, 1];
+const LIQUID_SEGMENTS = 72;
+
+function insideRadius(height: number): number {
+  if (height < CUP_INSIDE[0][0] || height > CUP_MOUTH) return -1;
+  for (let i = 1; i < CUP_INSIDE.length; i++) {
+    const [h1, r1] = CUP_INSIDE[i];
+    if (height <= h1) {
+      const [h0, r0] = CUP_INSIDE[i - 1];
+      return r0 + ((r1 - r0) * (height - h0)) / (h1 - h0) - LIQUID_INSET;
+    }
+  }
+  return -1;
+}
+
+function createLiquidGeometry(): THREE.BufferGeometry {
+  const count = 1 + LIQUID_RINGS.length * LIQUID_SEGMENTS;
+  const geometry = new THREE.BufferGeometry();
+  for (const [name, size] of [["position", 3], ["normal", 3], ["color", 3], ["uv", 2], ["teaRadius", 1]] as const) {
+    geometry.setAttribute(name, new THREE.BufferAttribute(new Float32Array(count * size), size));
+  }
+  const color = teaShade(0);
+  color.toArray(geometry.getAttribute("color").array as Float32Array, 0);
+  const index: number[] = [];
+  for (let s = 0; s < LIQUID_SEGMENTS; s++) {
+    const next = (s + 1) % LIQUID_SEGMENTS;
+    index.push(0, 1 + next, 1 + s);
+    for (let ring = 1; ring < LIQUID_RINGS.length; ring++) {
+      const a = 1 + (ring - 1) * LIQUID_SEGMENTS;
+      const b = 1 + ring * LIQUID_SEGMENTS;
+      index.push(a + s, a + next, b + s, a + next, b + next, b + s);
+    }
+  }
+  geometry.setIndex(index);
+  for (let ring = 0; ring < LIQUID_RINGS.length; ring++) {
+    const shade = teaShade(LIQUID_RINGS[ring] * 0.53);
+    for (let s = 0; s < LIQUID_SEGMENTS; s++) {
+      const i = 1 + ring * LIQUID_SEGMENTS + s;
+      shade.toArray(geometry.getAttribute("color").array as Float32Array, i * 3);
+      (geometry.getAttribute("teaRadius").array as Float32Array)[i] = LIQUID_RINGS[ring] * 0.53;
+    }
+  }
+  geometry.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 0.5, 0), 1.2);
+  return geometry;
+}
+
+/**
+ * Cuts the liquid surface, a plane that stays level in the world, to the inside of the
+ * cup. `normal` is world-up in cup space; `offset` is the surface height above the cup
+ * center along it. The liquid never rises above the lowest point of the lip.
+ */
+function shapeLiquid(geometry: THREE.BufferGeometry, normal: THREE.Vector3, offset: number): void {
+  const rimLow = (CUP_MOUTH - CUP_CENTER.y) * normal.y
+    - CUP_RIM_RADIUS * Math.sqrt(Math.max(0, 1 - normal.y * normal.y)) - 0.02;
+  const ny = Math.max(normal.y, 0.2);
+  const d = normal.y * CUP_CENTER.y + Math.min(offset, rimLow);
+  const axisY = THREE.MathUtils.clamp(d / ny, CUP_INSIDE[0][0] + 0.02, CUP_MOUTH - 0.02);
+  const plane = axisY * ny;
+  const position = geometry.getAttribute("position") as THREE.BufferAttribute;
+  const normals = geometry.getAttribute("normal") as THREE.BufferAttribute;
+  const uv = geometry.getAttribute("uv") as THREE.BufferAttribute;
+  position.setXYZ(0, 0, axisY, 0);
+  normals.setXYZ(0, normal.x, normal.y, normal.z);
+  uv.setXY(0, 0.5, 0.5);
+  const surfaceY = (r: number, cos: number, sin: number): number =>
+    (plane - r * (normal.x * cos + normal.z * sin)) / ny;
+  for (let s = 0; s < LIQUID_SEGMENTS; s++) {
+    const angle = (s / LIQUID_SEGMENTS) * Math.PI * 2;
+    const cos = Math.cos(angle);
+    const sin = Math.sin(angle);
+    const fits = (r: number): boolean => {
+      const wall = insideRadius(surfaceY(r, cos, sin));
+      return wall >= r;
+    };
+    let low = 0;
+    let high = 0.2;
+    while (fits(high) && high < 0.9) {
+      low = high;
+      high += 0.04;
+    }
+    for (let i = 0; i < 9; i++) {
+      const mid = (low + high) / 2;
+      if (fits(mid)) low = mid;
+      else high = mid;
+    }
+    for (let ring = 0; ring < LIQUID_RINGS.length; ring++) {
+      const i = 1 + ring * LIQUID_SEGMENTS + s;
+      const r = low * LIQUID_RINGS[ring];
+      position.setXYZ(i, r * cos, surfaceY(r, cos, sin), r * sin);
+      normals.setXYZ(i, normal.x, normal.y, normal.z);
+      uv.setXY(i, (r * cos) / 1.2 + 0.5, (r * sin) / 1.2 + 0.5);
+    }
+  }
+  position.needsUpdate = normals.needsUpdate = uv.needsUpdate = true;
+}
+
 function planarUv(geometry: THREE.BufferGeometry, tile: number, vertical: "y" | "z"): void {
   const position = geometry.getAttribute("position");
   const uv = geometry.getAttribute("uv");
@@ -195,6 +347,10 @@ export class ChessRoom {
   private readonly textures = new Set<THREE.Texture>();
   private readonly environment: THREE.WebGLRenderTarget;
   private readonly teaMaterial: THREE.MeshPhysicalMaterial;
+  private readonly cups: TeaCup[] = [];
+  private drink: DrinkState | null = null;
+  private activeSide: TeaSide | null = null;
+  onTeaSound: (sound: TeaSound) => void = () => undefined;
   private timberCount = 0;
   private disposed = false;
   private readonly tableTopMaterial = new THREE.MeshStandardMaterial({
@@ -230,21 +386,24 @@ export class ChessRoom {
     this.teaMaterial = new THREE.MeshPhysicalMaterial({
       color: "#ffffff",
       vertexColors: true,
-      roughness: 0.05,
+      roughness: 0.02,
+      clearcoat: 1,
+      clearcoatRoughness: 0.015,
+      specularIntensity: 1,
       transmission: 0.92,
       thickness: 0.45,
       attenuationColor: new THREE.Color("#b6c658"),
       attenuationDistance: 0.55,
       ior: 1.33,
       envMap: this.environment.texture,
-      envMapIntensity: 1,
+      envMapIntensity: 2.2,
       normalScale: new THREE.Vector2(0.04, 0.04),
     });
     // Lamp light refracted through the thin edge of the liquid lands on the glaze
     // as a bright rim just inside the cup wall.
     this.teaMaterial.onBeforeCompile = shader => {
-      shader.vertexShader = `varying float vTeaRadius;\n${shader.vertexShader}`.replace(
-        "#include <begin_vertex>", "#include <begin_vertex>\nvTeaRadius = length(position.xz);",
+      shader.vertexShader = `attribute float teaRadius;\nvarying float vTeaRadius;\n${shader.vertexShader}`.replace(
+        "#include <begin_vertex>", "#include <begin_vertex>\nvTeaRadius = teaRadius;",
       );
       shader.fragmentShader = `varying float vTeaRadius;\n${shader.fragmentShader}`.replace(
         "#include <emissivemap_fragment>",
@@ -307,7 +466,128 @@ reflectedLight.directSpecular *= ambientOcclusion;
     }
     // Views from above look down into the room through an open ceiling.
     this.ceiling.visible = camera.position.y < CEILING_Y;
+    this.updateCups(time, camera);
     this.syncWoodTextures();
+  }
+
+  get isDrinking(): boolean {
+    return this.drink !== null;
+  }
+
+  setActiveSide(side: TeaSide | null): void {
+    this.activeSide = side;
+    if (side === null || this.drink?.cup.side !== side) this.clearHover();
+  }
+
+  private clearHover(): void {
+    for (const cup of this.cups) cup.hovered = false;
+  }
+
+  /** The cup under the ray, but only if it belongs to the side to move. */
+  pickCup(raycaster: THREE.Raycaster): TeaSide | null {
+    if (this.activeSide === null) return null;
+    const cup = this.cups.find(item => item.side === this.activeSide);
+    if (!cup || raycaster.intersectObject(cup.group, true).length === 0) return null;
+    return cup.side;
+  }
+
+  setHover(side: TeaSide | null): void {
+    for (const cup of this.cups) cup.hovered = cup.side === side && side === this.activeSide;
+  }
+
+  startDrink(side: TeaSide): boolean {
+    const cup = this.cups.find(item => item.side === side);
+    if (!cup || this.drink || side !== this.activeSide) return false;
+    this.drink = { cup, start: null, lifted: false, sipped: false, placed: false };
+    return true;
+  }
+
+  // The camera is the drinker's head: the cup is carried to a spot right in front of it,
+  // large on screen, then tipped with its mouth toward the viewer.
+  private holdPose(camera: THREE.PerspectiveCamera): { center: THREE.Vector3; tiltAxis: THREE.Vector3 } {
+    const forward = camera.getWorldDirection(new THREE.Vector3());
+    const up = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion);
+    const visible = 2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+    const span = Math.min(1, camera.aspect);
+    const distance = HOLD_EXTENT / (HOLD_SCREEN_FRACTION * visible * span);
+    const center = camera.position.clone()
+      .addScaledVector(forward, distance)
+      .addScaledVector(up, -0.06 * visible * distance);
+    const toViewer = new THREE.Vector3(-forward.x, 0, -forward.z);
+    if (toViewer.lengthSq() < 1e-6) toViewer.set(0, 0, 1);
+    toViewer.normalize();
+    return { center, tiltAxis: new THREE.Vector3(0, 1, 0).cross(toViewer).normalize() };
+  }
+
+  private updateCups(time: number, camera: THREE.PerspectiveCamera): void {
+    const breath = 0.5 - 0.5 * Math.cos((time / GLOW_PERIOD) * Math.PI * 2);
+    for (const cup of this.cups) {
+      cup.material.emissiveIntensity = cup.hovered ? GLOW_MIN + (GLOW_MAX - GLOW_MIN) * breath : 0;
+    }
+    const drink = this.drink;
+    if (!drink) return;
+    drink.start ??= time;
+    const t = time - drink.start;
+    const { cup } = drink;
+    const rest = cup.origin.clone().add(new THREE.Vector3(0, CUP_BASE + CUP_CENTER.y, 0));
+    const hold = this.holdPose(camera);
+    const center = new THREE.Vector3();
+    let turn = 0;
+    let tilt = 0;
+    let level = 0;
+    if (t < 0.6) {
+      if (!drink.lifted) {
+        drink.lifted = true;
+        this.onTeaSound("lift");
+      }
+      const travel = segment(t, 0, 0.6);
+      center.lerpVectors(rest, hold.center, travel);
+      turn = travel;
+    } else if (t < 1.8) {
+      center.copy(hold.center);
+      turn = 1;
+      tilt = segment(t, 0.6, 1.2);
+      level = segment(t, 0.6, 1.8);
+      if (!drink.sipped) {
+        drink.sipped = true;
+        this.onTeaSound("sip");
+      }
+    } else if (t < 2.6) {
+      const back = segment(t, 1.8, 2.6);
+      center.lerpVectors(hold.center, rest.clone().add(new THREE.Vector3(0, 0.3, 0)), back);
+      turn = 1 - back;
+      tilt = 1 - segment(t, 1.8, 2.2);
+      level = 1;
+    } else {
+      const down = segment(t, 2.6, DRINK_DURATION);
+      center.copy(rest).add(new THREE.Vector3(0, 0.3 * (1 - down), 0));
+      level = 1 - down;
+      // easeOutCubic settles onto the saucer around 2.95s, where the clip's impact lands.
+      if (!drink.placed && t > 2.95) {
+        drink.placed = true;
+        this.onTeaSound("place");
+      }
+    }
+    const rotation = new THREE.Quaternion()
+      .setFromAxisAngle(hold.tiltAxis, HOLD_TILT * tilt)
+      .multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), 0.6 * turn));
+    cup.vessel.quaternion.copy(rotation);
+    cup.vessel.position
+      .copy(center)
+      .sub(cup.group.position)
+      .sub(CUP_CENTER.clone().applyQuaternion(rotation));
+    cup.steam.visible = tilt === 0 && turn === 0;
+    // The surface stays level in the world: it is re-cut to the cup every frame.
+    cup.tea.geometry = cup.liquid;
+    const up = new THREE.Vector3(0, 1, 0).applyQuaternion(rotation.clone().invert());
+    shapeLiquid(cup.liquid, up, 0.68 - CUP_CENTER.y - LIQUID_DROP * level);
+    if (t >= DRINK_DURATION) {
+      cup.vessel.position.set(0, CUP_BASE, 0);
+      cup.vessel.quaternion.identity();
+      cup.tea.geometry = cup.staticTea;
+      cup.steam.visible = true;
+      this.drink = null;
+    }
   }
 
   syncWoodTextures(): void {
@@ -381,10 +661,11 @@ reflectedLight.directSpecular *= ambientOcclusion;
   }
 
   private applyPbr(
-    material: THREE.MeshStandardMaterial,
+    material: THREE.MeshStandardMaterial | THREE.MeshStandardMaterial[],
     set: PbrTextureSet,
     repeat?: [number, number],
   ): void {
+    const materials = Array.isArray(material) ? material : [material];
     const maps = [
       ["map", set.albedo, THREE.SRGBColorSpace],
       ["normalMap", set.normal, THREE.NoColorSpace],
@@ -393,8 +674,10 @@ reflectedLight.directSpecular *= ambientOcclusion;
     ] as const;
     for (const [property, url, colorSpace] of maps) {
       this.load(url, colorSpace, texture => {
-        material[property] = texture;
-        material.needsUpdate = true;
+        for (const target of materials) {
+          target[property] = texture;
+          target.needsUpdate = true;
+        }
       }, repeat);
     }
   }
@@ -687,6 +970,7 @@ reflectedLight.directSpecular *= ambientOcclusion;
   }
 
   private buildTea(): void {
+    const makeCeladon = (): THREE.MeshPhysicalMaterial => {
     const celadon = new THREE.MeshPhysicalMaterial({
       color: "#ffffff",
       // The roughness map sits at 0.18: a broad, soft highlight rather than a hard glint.
@@ -698,6 +982,8 @@ reflectedLight.directSpecular *= ambientOcclusion;
       envMapIntensity: 0.45,
       normalScale: new THREE.Vector2(1.2, 1.2),
       aoMapIntensity: 1,
+      emissive: new THREE.Color("#8fd3b8"),
+      emissiveIntensity: 0,
     });
     // Faint subsurface scatter: lamp light wraps past the terminator and glows
     // back through the thin wall, as it does in translucent celadon.
@@ -712,7 +998,10 @@ float through = pow(clamp(dot(normalize(vViewPosition), -normalize(lampDirection
 totalEmissiveRadiance += vec3(0.05, 0.075, 0.065) * diffuseColor.rgb * (0.5 * wrap * wrap + through);`,
       );
     };
-    this.applyPbr(celadon, roomTextureManifest.celadon, [2, 1]);
+    return celadon;
+    };
+    const celadons = [makeCeladon(), makeCeladon()];
+    this.applyPbr(celadons, roomTextureManifest.celadon, [2, 1]);
     // Tall wide-mouthed cup: small foot, rounded belly, near-upright wall, flared thin lip.
     const cupHeight = 0.906;
     const outerGeometry = revolve([
@@ -721,13 +1010,13 @@ totalEmissiveRadiance += vec3(0.05, 0.075, 0.065) * diffuseColor.rgb * (0.5 * wr
         [0.27, 0.085], [0.38, 0.13], [0.47, 0.22], [0.52, 0.34], [0.537, 0.47],
         [0.545, 0.6], [0.56, 0.72], [0.585, 0.82], [0.612, 0.89],
       ]),
-      ...vectors([[0.616, 0.9], [0.608, cupHeight]]),
+      ...vectors([[0.62, 0.896], [0.622, 0.902], [0.616, 0.91], [0.6, cupHeight + 0.008]]),
     ], (_radius, height) => height / cupHeight);
     // The inside samples the thin pale glaze near the rim of the same texture.
     const innerGeometry = revolve([
-      ...vectors([[0.608, cupHeight], [0.598, 0.9]]),
+      ...vectors([[0.6, cupHeight + 0.008], [0.58, cupHeight + 0.006], [0.568, 0.9]]),
       ...curve([
-        [0.592, 0.885], [0.566, 0.81], [0.54, 0.72], [0.523, 0.6], [0.513, 0.47],
+        [0.564, 0.885], [0.548, 0.81], [0.53, 0.72], [0.518, 0.6], [0.509, 0.47],
         [0.494, 0.34], [0.44, 0.225], [0.34, 0.15], [0.18, 0.118], [0, 0.112],
       ]),
     ], (_radius, height) => 0.88 + 0.08 * height / cupHeight);
@@ -738,12 +1027,12 @@ totalEmissiveRadiance += vec3(0.05, 0.075, 0.065) * diffuseColor.rgb * (0.5 * wr
       curve([[0.537, 0.694], [0.526, 0.685], [0.497, 0.681], [0.3, 0.68], [0, 0.68]]), 72,
     );
     planarUv(teaGeometry, 1.2, "z");
-    const deep = new THREE.Color("#a7ba4b");
-    const shallow = new THREE.Color("#e3e69f");
-    const rim = new THREE.Color("#fffde0");
-    shadeByRadius(teaGeometry, radius => deep.clone()
-      .lerp(shallow, THREE.MathUtils.smoothstep(radius, 0.12, 0.47))
-      .lerp(rim, THREE.MathUtils.smoothstep(radius, 0.485, 0.53)));
+    shadeByRadius(teaGeometry, radius => teaShade(radius));
+    teaGeometry.setAttribute("teaRadius", new THREE.BufferAttribute(
+      Float32Array.from({ length: teaGeometry.getAttribute("position").count }, (_, i) =>
+        Math.hypot(teaGeometry.getAttribute("position").getX(i), teaGeometry.getAttribute("position").getZ(i))),
+      1,
+    ));
     // Thin walnut saucer: a flat well inside a raised rounded rim.
     const saucerGeometry = new THREE.LatheGeometry(vectors([
       [0, 0], [0.56, 0], [0.66, 0.028], [0.7, 0.07], [0.69, 0.092], [0.665, 0.094],
@@ -757,7 +1046,8 @@ totalEmissiveRadiance += vec3(0.05, 0.075, 0.065) * diffuseColor.rgb * (0.5 * wr
       height < 0.04 || radius > 0.6 ? 1 : 1 - 0.7 * Math.exp(-Math.max(radius - 0.25, 0) / 0.1),
     ));
     const steamMaterial = this.steamMaterial();
-    for (const position of CUP_POSITIONS) {
+    for (const [index, position] of CUP_POSITIONS.entries()) {
+      const celadon = celadons[index];
       const group = new THREE.Group();
       group.name = position.z > 0 ? "RedLeftHandTea" : "BlackLeftHandTea";
       group.position.copy(position);
@@ -772,6 +1062,12 @@ totalEmissiveRadiance += vec3(0.05, 0.075, 0.065) * diffuseColor.rgb * (0.5 * wr
         mesh.receiveShadow = true;
         group.add(mesh);
       }
+      // The saucer stays on the table; only cup and tea travel.
+      const vessel = new THREE.Group();
+      vessel.position.y = 0.045;
+      outer.position.y = inner.position.y = tea.position.y = 0;
+      group.add(vessel);
+      vessel.add(outer, inner, tea);
 
       // Steam leaves the whole liquid surface, not a single point.
       const count = 40;
@@ -789,7 +1085,20 @@ totalEmissiveRadiance += vec3(0.05, 0.075, 0.065) * diffuseColor.rgb * (0.5 * wr
       geometry.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 2, 0), 2.4);
       const steam = new THREE.Points(geometry, steamMaterial);
       steam.name = "TeaSteam";
-      group.add(steam);
+      steam.raycast = () => undefined;
+      vessel.add(steam);
+      this.cups.push({
+        side: position.z > 0 ? "red" : "black",
+        group,
+        vessel,
+        tea,
+        staticTea: teaGeometry,
+        liquid: createLiquidGeometry(),
+        material: celadon,
+        steam,
+        origin: position.clone(),
+        hovered: false,
+      });
     }
   }
 

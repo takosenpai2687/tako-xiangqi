@@ -30,6 +30,8 @@ export interface GameState {
   thinking: boolean;
 }
 
+const TEA_SOUNDS = { lift: "cupLift", sip: "teaSip", place: "cupPlace" } as const;
+
 function countByType(pieces: ChessPiece[]): number[] {
   const counts = new Array<number>(7).fill(0);
   for (const piece of pieces) counts[piece.type] += 1;
@@ -71,6 +73,7 @@ export class GameController {
     this.board = new window.XiangqiRules.Chessboard(1);
     this.history = [this.snapshot()];
     this.renderer.setActionHandler(action => this.handleBoardAction(action));
+    this.renderer.setTeaSoundHandler(sound => this.audio.play(TEA_SOUNDS[sound]));
     this.render();
   }
 
@@ -84,8 +87,7 @@ export class GameController {
   // Locked views: local play snaps to the side to move; against the AI only the
   // player's side is ever locked, so the button returns to it instead of flipping.
   resetView(): void {
-    if (this.ai) this.renderer.setViewForTurn(this.rules.sides.red, true);
-    else this.renderer.rotateView();
+    this.renderer.setViewForTurn(this.ai ? this.rules.sides.red : this.turn, true);
   }
 
   undo(): void {
@@ -329,6 +331,12 @@ export class GameController {
   }
 
   private notify(): void {
+    // Only the side to move may touch its cup; the AI's cup stays idle.
+    const playing = this.started && !this.winner &&
+      !(this.ai && this.turn === this.rules.sides.black);
+    this.renderer.setTeaSide(
+      playing ? (this.turn === this.rules.sides.red ? "red" : "black") : null,
+    );
     const pieces = this.board.state.flat().filter(
       (piece): piece is ChessPiece => piece !== null,
     );

@@ -17,7 +17,7 @@ import { pieceTypeNames } from "./domain";
 import { textureManifest } from "./textures";
 import { CaptureBoxes, CAPTURE_SCENE_WIDTH } from "./capture-boxes";
 import { RoomAtmospherePass } from "./room-atmosphere-pass";
-import { ChessRoom } from "./chess-room";
+import { ChessRoom, type TeaSide, type TeaSound } from "./chess-room";
 
 const BOARD_WIDTH = 8;
 // Fixed overview framing: the wooden board body (9.55 x 10.55) plus piece height,
@@ -283,6 +283,14 @@ export class BoardRenderer {
 
   setActionHandler(handler: (action: BoardAction) => void): void {
     this.onAction = handler;
+  }
+
+  setTeaSide(side: TeaSide | null): void {
+    this.room.setActiveSide(side);
+  }
+
+  setTeaSoundHandler(handler: (sound: TeaSound) => void): void {
+    this.room.onTeaSound = handler;
   }
 
   setMenuMode(active: boolean): void {
@@ -1166,6 +1174,14 @@ void main() {
   private onPointerDown(event: PointerEvent): void {
     if (this.menuMode || this.cameraTransition || this.captureBoxes.isAnimating) return;
     if (event.button !== 0 && event.pointerType !== "touch") return;
+    // The board stays locked while the cup is in motion.
+    if (this.room.isDrinking) return;
+    const cup = this.hitCup(event);
+    if (cup) {
+      event.stopImmediatePropagation();
+      this.room.startDrink(cup);
+      return;
+    }
     const piece = this.hitPiece(event);
     const point = this.boardPoint(event);
     this.pointerStart = {
@@ -1189,8 +1205,10 @@ void main() {
     if (this.menuMode || this.cameraTransition || this.captureBoxes.isAnimating) return;
     const start = this.pointerStart;
     if (!start) {
-      this.hoveredPiece = this.hitPiece(event);
-      this.renderer.domElement.style.cursor = this.hoveredPiece ? "pointer" : "";
+      const cup = this.hitCup(event);
+      this.room.setHover(cup);
+      this.hoveredPiece = cup ? null : this.hitPiece(event);
+      this.renderer.domElement.style.cursor = cup || this.hoveredPiece ? "pointer" : "";
       return;
     }
     if (start.pointerId !== event.pointerId) return;
@@ -1254,6 +1272,12 @@ void main() {
       piece: this.hitPiece(event),
       dragged: false,
     });
+  }
+
+  private hitCup(event: PointerEvent): TeaSide | null {
+    this.setPointer(event);
+    this.raycaster.setFromCamera(this.pointer, this.camera);
+    return this.room.pickCup(this.raycaster);
   }
 
   private hitPiece(event: PointerEvent): ChessPiece | null {

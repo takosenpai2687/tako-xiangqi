@@ -1,4 +1,6 @@
-type SoundName = "pickup" | "redMove" | "blackMove" | "capture" | "undo";
+type SoundName =
+  | "pickup" | "redMove" | "blackMove" | "capture" | "undo"
+  | "cupLift" | "teaSip" | "cupPlace";
 type PlayingSide = "red" | "black";
 
 export class GameAudio {
@@ -12,6 +14,9 @@ export class GameAudio {
       blackMove: new Audio(`${audioBase}black-move.mp3`),
       capture: new Audio(`${audioBase}capture.mp3`),
       undo: new Audio(`${audioBase}undo.mp3`),
+      cupLift: new Audio(`${audioBase}cup-lift.mp3`),
+      teaSip: new Audio(`${audioBase}tea-sip.mp3`),
+      cupPlace: new Audio(`${audioBase}cup-place.mp3`),
     };
 
     for (const clip of Object.values(this.clips)) clip.preload = "auto";

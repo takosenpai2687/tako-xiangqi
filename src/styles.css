@@ -21,6 +21,9 @@
 
 * {
   box-sizing: border-box;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
 }
 
 html,
@@ -361,12 +364,12 @@ button svg {
   top: max(var(--hud-inset), env(safe-area-inset-top));
 }
 
-.hud-home,
-.hud-players {
+.hud-home {
   left: max(var(--hud-inset), env(safe-area-inset-left));
 }
 
 .hud-turn,
+.hud-players,
 .hud-actions {
   right: max(var(--hud-inset), env(safe-area-inset-right));
 }
@@ -546,7 +549,8 @@ button svg {
 }
 
 .hud-players {
-  align-items: flex-start;
+  bottom: calc(max(var(--hud-inset), env(safe-area-inset-bottom)) + 66px);
+  align-items: flex-end;
   flex-direction: column;
   gap: 10px;
 }
@@ -829,6 +833,7 @@ button svg {
   }
 
   .hud-players {
+    bottom: calc(max(var(--hud-inset), env(safe-area-inset-bottom)) + 60px);
     gap: 8px;
   }
 
