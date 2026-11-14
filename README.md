@@ -16,7 +16,7 @@ Play Chinese chess with a friend in a quiet Japanese-style tea room, or challeng
 - Piece selection, movement, captures, and captured-piece storage have animations.
 - Distinct red and black move sounds, plus piece pickup, capture, and undo sounds.
 - Undo, restart, and a victory screen.
-- Chinese and English UI, selectable from the main menu; the choice is saved locally. Piece textures remain unchanged.
+- Chinese and English UI: defaults to Chinese for a Chinese browser language, otherwise English. Choose from the main menu; your choice is saved locally and takes priority on future visits. Piece textures remain unchanged.
 - Graphics settings for ambient occlusion, depth of field, anti-aliasing, and volumetric light.
 - Automatic resource routing: mainland China (`CN`) uses Shanghai OSS; other regions use same-origin Netlify assets. Override the source in Graphics (reloads the page).
 
@@ -24,6 +24,7 @@ Play Chinese chess with a friend in a quiet Japanese-style tea room, or challeng
 
 - Select a piece and then a legal destination, or drag the piece to move it.
 - Drag from an empty area to rotate the view; use the mouse wheel to zoom.
+- 🍵 Your move, your tea break. Click your cup on your turn to take a sip—no rush!
 - Use the on-screen controls to undo or restart.
 
 ### Resource hosting
@@ -56,7 +57,7 @@ Play Chinese chess with a friend in a quiet Japanese-style tea room, or challeng
 - 棋子升起、落子、吃子和提子入盒均有动画反馈。
 - 红黑双方使用不同的落子音效，并提供选子、吃子和悔棋音效。
 - 支持悔棋、重开与胜局提示。
-- 主菜单可切换中英文界面，自动记住选择；棋子贴图不变。
+- 首次访问跟随浏览器语言：中文环境默认中文，其余默认英文。主菜单可切换语言，本机记住选择，下次访问优先使用；棋子贴图不变。
 - 可调整环境光遮蔽、景深、抗锯齿与体积光。
 - 自动资源分流：中国大陆（`CN`）使用上海 OSS，其余地区使用 Netlify 同源资源；画面设置中可手动选择线路（切换后刷新页面）。
 
@@ -64,6 +65,7 @@ Play Chinese chess with a friend in a quiet Japanese-style tea room, or challeng
 
 - 点击棋子，再点击合法落点；也可以直接拖动棋子落子。
 - 从棋子以外的位置拖动可旋转视角；滚轮可缩放。
+- 🍵 棋可以慢慢想，茶可别凉了。轮到你时，点点自己的茶杯，先喝一口～
 - 使用界面上的“悔棋”和“重开”进行对应操作。
 
 ### 资源托管
