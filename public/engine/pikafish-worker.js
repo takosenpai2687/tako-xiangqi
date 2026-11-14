@@ -19,18 +19,66 @@ function handleLine(line) {
   }
 }
 
+const DATA_URL = new URL("pikafish.data", self.location.href).href;
+// Bump when pikafish.data changes so stale copies in Cache Storage are discarded.
+const DATA_CACHE = "pikafish-data-v1";
+const DATA_SIZE = 50706378;
+
+// Returns pikafish.data as an ArrayBuffer, downloading it only once: later visits read it from
+// Cache Storage (which survives refreshes) instead of the HTTP cache, which may refuse 50 MB.
+async function loadData() {
+  let cache = null;
+  try {
+    cache = await caches.open(DATA_CACHE);
+    const hit = await cache.match(DATA_URL);
+    if (hit) {
+      const buffer = await hit.arrayBuffer();
+      if (buffer.byteLength === DATA_SIZE) {
+        self.postMessage({ type: "progress", value: 1 });
+        return buffer;
+      }
+      await cache.delete(DATA_URL);
+    }
+  } catch {
+    cache = null;
+  }
+
+  const response = await fetch(DATA_URL);
+  if (!response.ok || !response.body) throw new Error("Failed to download engine data");
+  const reader = response.body.getReader();
+  const chunks = [];
+  let loaded = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+    loaded += value.byteLength;
+    self.postMessage({ type: "progress", value: Math.min(1, loaded / DATA_SIZE) });
+  }
+  const bytes = new Uint8Array(loaded);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  if (cache && loaded === DATA_SIZE) {
+    try {
+      await cache.put(DATA_URL, new Response(bytes, { headers: { "Content-Type": "application/octet-stream" } }));
+    } catch {
+      // Storage may be full or unavailable; the engine still works without the cache.
+    }
+  }
+  return bytes.buffer;
+}
+
 async function init() {
   try {
+    const data = await loadData();
     const module = await Pikafish({
       print: handleLine,
       printErr() {},
-      // Emscripten reports preload-file download as "Downloading data... (loaded/total)".
-      setStatus(text) {
-        const match = /\((\d+)\/(\d+)\)/.exec(text || "");
-        if (match && Number(match[2]) > 0) {
-          self.postMessage({ type: "progress", value: Number(match[1]) / Number(match[2]) });
-        }
-      },
+      // Hand Emscripten the already-downloaded data instead of letting it fetch it again.
+      getPreloadedPackage: () => data,
     });
     engine = module.cwrap("wasm_uci_execute", null, ["string"]);
     engine("uci");
