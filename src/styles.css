@@ -526,7 +526,8 @@ button svg {
 }
 
 #black-player .player-marker {
-  background: #c2aa72;
+  background: #2a2623;
+  box-shadow: 0 0 0 1.5px #8a8272;
 }
 
 #red-player.is-active {
@@ -547,7 +548,70 @@ button svg {
 .hud-players {
   align-items: flex-start;
   flex-direction: column;
-  gap: 16px;
+  gap: 10px;
+}
+
+.roster {
+  display: flex;
+  gap: 6px;
+}
+
+.roster-piece {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1.5px solid currentcolor;
+  border-radius: 50%;
+  background: rgb(24 20 16 / 62%);
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1;
+  transition: opacity 260ms ease, filter 260ms ease;
+}
+
+#red-roster .roster-piece {
+  border-color: #e3a18d;
+  background: #9c3a2d;
+  color: #fff1e6;
+}
+
+#black-roster .roster-piece {
+  border-color: #8a8272;
+  background: #121010;
+  color: #e8e2d4;
+}
+
+.roster-piece.is-lost {
+  opacity: 0.2;
+  filter: grayscale(1);
+}
+
+.roster-count {
+  position: absolute;
+  right: -4px;
+  bottom: -4px;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 3px;
+  border-radius: 8px;
+  background: #1c1713;
+  color: #eee5d5;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 700;
+  line-height: 15px;
+  text-align: center;
+}
+
+.roster-count:empty,
+.roster-piece.is-lost .roster-count {
+  display: none;
+}
+
+.roster-piece.is-hurt .roster-count {
+  color: #e8b85c;
 }
 
 .action-button {
@@ -765,12 +829,21 @@ button svg {
   }
 
   .hud-players {
-    gap: 14px;
+    gap: 8px;
+  }
+
+  .roster {
+    gap: 4px;
+  }
+
+  .roster-piece {
+    width: 28px;
+    height: 28px;
+    font-size: 15px;
   }
 
   .player-chip {
-    gap: 9px;
-    font-size: 18px;
+    gap: 7px;
   }
 
   .player-marker {

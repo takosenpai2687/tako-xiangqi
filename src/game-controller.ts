@@ -23,8 +23,17 @@ export interface GameState {
   moveCount: number;
   capturedRed: number;
   capturedBlack: number;
+  // Surviving piece counts indexed by piece type.
+  aliveRed: number[];
+  aliveBlack: number[];
   lastMove: MoveRecord | null;
   thinking: boolean;
+}
+
+function countByType(pieces: ChessPiece[]): number[] {
+  const counts = new Array<number>(7).fill(0);
+  for (const piece of pieces) counts[piece.type] += 1;
+  return counts;
 }
 
 export interface GameView {
@@ -333,6 +342,8 @@ export class GameController {
       moveCount: this.moveCount,
       capturedRed: 16 - redPieces.length,
       capturedBlack: 16 - blackPieces.length,
+      aliveRed: countByType(redPieces),
+      aliveBlack: countByType(blackPieces),
       lastMove: this.lastMove,
       thinking: this.thinking,
     });

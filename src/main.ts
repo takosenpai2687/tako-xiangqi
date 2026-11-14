@@ -39,6 +39,40 @@ const engineLoadingPercent = requireElement<HTMLElement>("engine-loading-percent
 const engineError = requireElement<HTMLElement>("engine-error");
 const sides = window.XiangqiRules.constants.sides;
 
+const ROSTER_GLYPHS = {
+  red: ["帅", "仕", "相", "傌", "俥", "炮", "兵"],
+  black: ["将", "士", "象", "馬", "車", "砲", "卒"],
+};
+const ROSTER_TOTALS = [1, 2, 2, 2, 2, 2, 5];
+const ROSTER_ORDER = [0, 4, 3, 5, 2, 1, 6];
+
+function buildRoster(side: "red" | "black"): HTMLElement[] {
+  const root = requireElement<HTMLElement>(`${side}-roster`);
+  return ROSTER_ORDER.map(type => {
+    const token = document.createElement("span");
+    token.className = "roster-piece";
+    token.textContent = ROSTER_GLYPHS[side][type];
+    const count = document.createElement("i");
+    count.className = "roster-count";
+    token.append(count);
+    root.append(token);
+    return token;
+  });
+}
+
+const rosterTokens = { red: buildRoster("red"), black: buildRoster("black") };
+
+function updateRoster(side: "red" | "black", alive: number[]): void {
+  ROSTER_ORDER.forEach((type, index) => {
+    const token = rosterTokens[side][index];
+    const count = alive[type];
+    token.classList.toggle("is-lost", count === 0);
+    token.classList.toggle("is-hurt", count > 0 && count < ROSTER_TOTALS[type]);
+    const badge = token.lastElementChild as HTMLElement;
+    badge.textContent = ROSTER_TOTALS[type] > 1 ? String(count) : "";
+  });
+}
+
 let renderer: BoardRenderer | null = null;
 let game: GameController | null = null;
 let loadingErrors = 0;
@@ -117,6 +151,8 @@ function describeState(state: GameState): void {
   redPlayer.setAttribute("aria-label", redTurn ? "红方行棋" : "红方等待");
   blackPlayer.setAttribute("aria-label", redTurn ? "黑方等待" : "黑方行棋");
   undoButton.disabled = state.moveCount === 0;
+  updateRoster("red", state.aliveRed);
+  updateRoster("black", state.aliveBlack);
   selectionNote.hidden = !state.selected && !state.thinking;
   selectionNote.textContent = state.thinking
     ? "思考中…"
