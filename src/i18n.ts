@@ -9,6 +9,13 @@ const english = {
   "本机对战": "Local game",
   "人机对战": "Play computer",
   "画面设置": "Graphics",
+  "资源线路": "Resource source",
+  "自动": "Auto",
+  "中国大陆 · 阿里云": "Mainland China · Aliyun",
+  "海外 · Netlify": "Overseas · Netlify",
+  "正在选择资源线路…": "Selecting a resource source…",
+  "无法保存资源线路设置，请检查浏览器存储权限。":
+    "Could not save the resource source. Please check your browser's storage permissions.",
   "简单": "Easy",
   "普通": "Normal",
   "困难": "Hard",

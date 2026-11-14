@@ -5,6 +5,7 @@ import { AiEngine, type AiLevel } from "./ai-engine";
 import { saveQuality, type QualitySettings } from "./quality";
 import { constants } from "./rules";
 import { applyTranslations, language, setLanguage, t, type Message } from "./i18n";
+import { getResourcePreference, initializeResourceSource, saveResourcePreference } from "./resource-source";
 import "./styles.css";
 
 applyTranslations();
@@ -43,6 +44,7 @@ const engineLoading = requireElement<HTMLElement>("engine-loading");
 const engineLoadingFill = requireElement<HTMLElement>("engine-loading-fill");
 const engineLoadingPercent = requireElement<HTMLElement>("engine-loading-percent");
 const engineError = requireElement<HTMLElement>("engine-error");
+const resourceSource = requireElement<HTMLSelectElement>("resource-source");
 const sides = constants.sides;
 
 const ROSTER_GLYPHS = {
@@ -292,56 +294,61 @@ function restartGame(): void {
   gameScreen.hidden = false;
 }
 
-try {
-  renderer = new BoardRenderer(viewport, canvas);
-  renderer.setMenuMode(true);
-  game = new GameController(renderer, {
-    onStateChange: describeState,
-    onWinner: winner => {
-      winnerSide = winner;
-      resultTitle.textContent = t(winner === "red" ? "红方获胜" : "黑方获胜");
-      resultEmblem.textContent = winner === "red" ? "帅" : "将";
-      resultDialog.dataset.winner = winner;
-      resultDialog.showModal();
-    },
-  });
-
-  startButton.addEventListener("click", startLocalGame);
-  requireElement<HTMLButtonElement>("btn-ai").addEventListener("click", () => showLevels(true));
-  requireElement<HTMLButtonElement>("btn-level-back").addEventListener("click", () => showLevels(false));
-  requireElement<HTMLButtonElement>("btn-settings").addEventListener("click", () => showSettings(true));
-  requireElement<HTMLButtonElement>("btn-settings-back").addEventListener("click", () => showSettings(false));
-  syncQualityButtons();
-  for (const button of settingsList.querySelectorAll<HTMLButtonElement>("[data-quality]")) {
-    button.addEventListener("click", () => {
-      if (!renderer) return;
-      const key = button.dataset.quality as keyof QualitySettings;
-      const current = renderer.getQuality();
-      const next = { ...current, [key]: key === "ssao" ? (current.ssao + 1) % 3 : !current[key] };
-      renderer.setQuality(next);
-      saveQuality(next);
-      syncQualityButtons();
+async function initializeGame(): Promise<void> {
+  try {
+    showLoadingMessage("正在选择资源线路…");
+    await initializeResourceSource();
+    showLoadingMessage("棋局正在展开…");
+    renderer = new BoardRenderer(viewport, canvas);
+    renderer.setMenuMode(true);
+    game = new GameController(renderer, {
+      onStateChange: describeState,
+      onWinner: winner => {
+        winnerSide = winner;
+        resultTitle.textContent = t(winner === "red" ? "红方获胜" : "黑方获胜");
+        resultEmblem.textContent = winner === "red" ? "帅" : "将";
+        resultDialog.dataset.winner = winner;
+        resultDialog.showModal();
+      },
     });
+
+    startButton.addEventListener("click", startLocalGame);
+    requireElement<HTMLButtonElement>("btn-ai").addEventListener("click", () => showLevels(true));
+    requireElement<HTMLButtonElement>("btn-level-back").addEventListener("click", () => showLevels(false));
+    requireElement<HTMLButtonElement>("btn-settings").addEventListener("click", () => showSettings(true));
+    requireElement<HTMLButtonElement>("btn-settings-back").addEventListener("click", () => showSettings(false));
+    syncQualityButtons();
+    for (const button of settingsList.querySelectorAll<HTMLButtonElement>("[data-quality]")) {
+      button.addEventListener("click", () => {
+        if (!renderer) return;
+        const key = button.dataset.quality as keyof QualitySettings;
+        const current = renderer.getQuality();
+        const next = { ...current, [key]: key === "ssao" ? (current.ssao + 1) % 3 : !current[key] };
+        renderer.setQuality(next);
+        saveQuality(next);
+        syncQualityButtons();
+      });
+    }
+    for (const button of levelList.querySelectorAll<HTMLButtonElement>("[data-level]")) {
+      button.addEventListener("click", () => void startAiGame(button.dataset.level as AiLevel));
+    }
+    requireElement<HTMLButtonElement>("btn-undo").addEventListener("click", () => {
+      game?.undo();
+    });
+    requireElement<HTMLButtonElement>("btn-new-game").addEventListener("click", restartGame);
+    requireElement<HTMLButtonElement>("btn-rematch").addEventListener("click", restartGame);
+    requireElement<HTMLButtonElement>("btn-menu").addEventListener("click", showMenu);
+    requireElement<HTMLButtonElement>("btn-view").addEventListener("click", () => {
+      game?.resetView();
+    });
+  } catch (error) {
+    console.error("棋盘初始化失败:", error);
+    rendererError.hidden = false;
+    rendererError.textContent =
+      t("无法启动 3D 棋盘。请使用支持 WebGL 的现代浏览器并重新载入页面。");
+    startButton.disabled = true;
+    finishLoading("棋盘启动失败");
   }
-  for (const button of levelList.querySelectorAll<HTMLButtonElement>("[data-level]")) {
-    button.addEventListener("click", () => void startAiGame(button.dataset.level as AiLevel));
-  }
-  requireElement<HTMLButtonElement>("btn-undo").addEventListener("click", () => {
-    game?.undo();
-  });
-  requireElement<HTMLButtonElement>("btn-new-game").addEventListener("click", restartGame);
-  requireElement<HTMLButtonElement>("btn-rematch").addEventListener("click", restartGame);
-  requireElement<HTMLButtonElement>("btn-menu").addEventListener("click", showMenu);
-  requireElement<HTMLButtonElement>("btn-view").addEventListener("click", () => {
-    game?.resetView();
-  });
-} catch (error) {
-  console.error("棋盘初始化失败:", error);
-  rendererError.hidden = false;
-  rendererError.textContent =
-    t("无法启动 3D 棋盘。请使用支持 WebGL 的现代浏览器并重新载入页面。");
-  startButton.disabled = true;
-  finishLoading("棋盘启动失败");
 }
 
 function refreshLanguage(): void {
@@ -365,6 +372,19 @@ for (const button of document.querySelectorAll<HTMLButtonElement>("[data-languag
   });
 }
 refreshLanguage();
+
+resourceSource.value = getResourcePreference();
+resourceSource.addEventListener("change", () => {
+  const preference = resourceSource.value;
+  if (preference !== "auto" && preference !== "cn" && preference !== "global") return;
+  if (saveResourcePreference(preference)) {
+    window.location.reload();
+  } else {
+    resourceSource.value = getResourcePreference();
+    window.alert(t("无法保存资源线路设置，请检查浏览器存储权限。"));
+  }
+});
+void initializeGame();
 
 if (import.meta.hot) {
   import.meta.hot.dispose(() => renderer?.dispose());

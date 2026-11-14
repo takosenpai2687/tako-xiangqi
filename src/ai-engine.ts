@@ -1,4 +1,5 @@
 import type { ChessPiece, Position } from "./domain";
+import { resourceUrl } from "./resource-source";
 
 export type AiLevel = "easy" | "normal" | "hard";
 
@@ -68,7 +69,8 @@ export class AiEngine {
   load(onProgress?: (fraction: number) => void): Promise<void> {
     if (this.ready) return this.ready;
     this.ready = new Promise<void>((resolve, reject) => {
-      const worker = new Worker(`${import.meta.env.BASE_URL}engine/pikafish-worker.js`);
+      // Version the worker entry: older deployments marked /engine/* immutable.
+      const worker = new Worker(`${import.meta.env.BASE_URL}engine/pikafish-worker.js?v=2`);
       this.worker = worker;
       worker.onmessage = event => {
         const data = event.data;
@@ -81,7 +83,11 @@ export class AiEngine {
         }
       };
       worker.onerror = event => reject(new Error(event.message || "engine failed"));
-      worker.postMessage({ type: "init" });
+      worker.postMessage({
+        type: "init",
+        dataUrl: resourceUrl("engine/pikafish.data"),
+        wasmUrl: resourceUrl("engine/pikafish.wasm"),
+      });
     });
     this.ready.catch(() => this.dispose());
     return this.ready;

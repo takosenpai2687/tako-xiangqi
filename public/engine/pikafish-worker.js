@@ -19,31 +19,32 @@ function handleLine(line) {
   }
 }
 
-const DATA_URL = new URL("pikafish.data", self.location.href).href;
+const LOCAL_DATA_URL = new URL("pikafish.data", self.location.href).href;
 // Bump when pikafish.data changes so stale copies in Cache Storage are discarded.
 const DATA_CACHE = "pikafish-data-v1";
 const DATA_SIZE = 50706378;
 
 // Returns pikafish.data as an ArrayBuffer, downloading it only once: later visits read it from
 // Cache Storage (which survives refreshes) instead of the HTTP cache, which may refuse 50 MB.
-async function loadData() {
+async function loadData(dataUrl) {
   let cache = null;
   try {
     cache = await caches.open(DATA_CACHE);
-    const hit = await cache.match(DATA_URL);
+    // Both sources serve the same engine version; reuse an existing local download.
+    const hit = await cache.match(LOCAL_DATA_URL);
     if (hit) {
       const buffer = await hit.arrayBuffer();
       if (buffer.byteLength === DATA_SIZE) {
         self.postMessage({ type: "progress", value: 1 });
         return buffer;
       }
-      await cache.delete(DATA_URL);
+      await cache.delete(LOCAL_DATA_URL);
     }
   } catch {
     cache = null;
   }
 
-  const response = await fetch(DATA_URL);
+  const response = await fetch(dataUrl);
   if (!response.ok || !response.body) throw new Error("Failed to download engine data");
   const reader = response.body.getReader();
   const chunks = [];
@@ -61,9 +62,10 @@ async function loadData() {
     bytes.set(chunk, offset);
     offset += chunk.byteLength;
   }
-  if (cache && loaded === DATA_SIZE) {
+  if (loaded !== DATA_SIZE) throw new Error(`Incomplete engine data: ${loaded}/${DATA_SIZE} bytes`);
+  if (cache) {
     try {
-      await cache.put(DATA_URL, new Response(bytes, { headers: { "Content-Type": "application/octet-stream" } }));
+      await cache.put(LOCAL_DATA_URL, new Response(bytes, { headers: { "Content-Type": "application/octet-stream" } }));
     } catch {
       // Storage may be full or unavailable; the engine still works without the cache.
     }
@@ -71,10 +73,11 @@ async function loadData() {
   return bytes.buffer;
 }
 
-async function init() {
+async function init(dataUrl, wasmUrl) {
   try {
-    const data = await loadData();
+    const data = await loadData(dataUrl);
     const module = await Pikafish({
+      locateFile: (path, directory) => path === "pikafish.wasm" ? wasmUrl : directory + path,
       print: handleLine,
       printErr() {},
       // Hand Emscripten the already-downloaded data instead of letting it fetch it again.
@@ -93,7 +96,7 @@ async function init() {
 self.onmessage = event => {
   const data = event.data;
   if (data.type === "init") {
-    init();
+    init(data.dataUrl || LOCAL_DATA_URL, data.wasmUrl || new URL("pikafish.wasm", self.location.href).href);
   } else if (data.type === "search" && engine) {
     pending = { id: data.id };
     for (const [name, value] of Object.entries(data.options)) {

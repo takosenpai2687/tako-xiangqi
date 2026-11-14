@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { resourceUrl } from "./resource-source";
 
 /**
  * Drop-in replacement for THREE.TextureLoader.
@@ -21,7 +22,7 @@ export class FetchTextureLoader extends THREE.TextureLoader {
   ): THREE.Texture {
     const texture = new THREE.Texture();
     const manager = this.manager;
-    const resolved = manager.resolveURL(url);
+    const resolved = resourceUrl(manager.resolveURL(url));
     manager.itemStart(url);
 
     const fail = (error: unknown): void => {

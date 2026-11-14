@@ -13,7 +13,22 @@
     Cross-Origin-Embedder-Policy = "require-corp"
 
 [[headers]]
-  for = "/engine/*"
+  for = "/engine/pikafish-worker.js"
+  [headers.values]
+    Cache-Control = "no-cache"
+
+[[headers]]
+  for = "/engine/pikafish.js"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/engine/pikafish.wasm"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/engine/pikafish.data"
   [headers.values]
     Cache-Control = "public, max-age=31536000, immutable"
 

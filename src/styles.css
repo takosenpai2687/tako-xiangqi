@@ -1010,6 +1010,27 @@ button svg {
   margin: -16px 0 20px;
 }
 
+.resource-source {
+  display: grid;
+  gap: 8px;
+  padding: 8px 0;
+  color: var(--ink);
+  font-size: 15px;
+}
+
+.resource-source select {
+  min-width: 0;
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 12px;
+  border: 2px solid var(--line);
+  border-radius: 4px;
+  background: var(--panel);
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+}
+
 .language-picker button {
   padding: 8px 4px;
   border: 0;
