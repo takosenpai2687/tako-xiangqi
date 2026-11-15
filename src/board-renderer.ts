@@ -33,7 +33,7 @@ const FIXED_FIT_TOP = 0.9;
 const FIXED_FIT_MARGIN = 0.96;
 // Camera direction of the fixed overview (red side); steeper means closer to top-down.
 const FIXED_VIEW_DIRECTION = new THREE.Vector3(0, 13, 8.2).normalize();
-const PORTRAIT_VIEW_DIRECTION = new THREE.Vector3(0, 13, 5.4).normalize();
+const PORTRAIT_VIEW_DIRECTION = new THREE.Vector3(0, 1, Math.tan(THREE.MathUtils.degToRad(5))).normalize();
 const BOARD_DEPTH = 9;
 const BOARD_TOP = 0.53;
 const PIECE_RADIUS = 0.39;
@@ -493,7 +493,8 @@ export class BoardRenderer {
       probe.updateProjectionMatrix();
       return corners.every(corner => {
         const ndc = corner.clone().project(probe);
-        return Math.abs(ndc.x) <= FIXED_FIT_MARGIN && Math.abs(ndc.y) <= FIXED_FIT_MARGIN;
+        const horizontalMargin = this.camera.aspect < 1 ? 0.995 : FIXED_FIT_MARGIN;
+        return Math.abs(ndc.x) <= horizontalMargin && Math.abs(ndc.y) <= FIXED_FIT_MARGIN;
       });
     };
     let near = 4;
@@ -1624,6 +1625,7 @@ void main() {
     const minDistance = fit * 0.6;
     this.controls.maxDistance = Math.max(48, fit * 1.6);
     const portrait = this.camera.aspect < 1;
+    this.controls.minPolarAngle = portrait ? THREE.MathUtils.degToRad(5) : Math.PI * 0.12;
     this.captureBoxes.setPortrait(portrait);
     this.room.setPortrait(portrait);
     const orientationChanged = portrait !== this.wasPortrait;

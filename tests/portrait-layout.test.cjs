@@ -32,7 +32,7 @@ test("portrait fixed views fit the board and both boxes for either side", () => 
     const renderer = Object.create(BoardRenderer.prototype);
     renderer.camera = new THREE.PerspectiveCamera(33, aspect, 0.1, 200);
     const portraitDirection = renderer.fixedDirection();
-    assert.ok(portraitDirection.z / portraitDirection.y < 8.2 / 13);
+    close(Math.atan2(portraitDirection.z, portraitDirection.y), THREE.MathUtils.degToRad(5));
     for (const side of [sides.red, sides.black]) {
       const target = new THREE.Vector3(0, 0.53, 0);
       renderer.camera.position.copy(target).add(renderer.fixedOffset(side));
@@ -40,6 +40,7 @@ test("portrait fixed views fit the board and both boxes for either side", () => 
       renderer.camera.updateMatrixWorld(true);
       renderer.camera.updateProjectionMatrix();
       const corners = [];
+      let boardWidth = 0;
       for (const x of [-4.78, 4.78]) for (const z of [-5.28, 5.28]) {
         for (const y of [0.53, 1.43]) corners.push(new THREE.Vector3(x, y, z));
       }
@@ -48,8 +49,10 @@ test("portrait fixed views fit the board and both boxes for either side", () => 
       }
       for (const corner of corners) {
         const projected = corner.project(renderer.camera);
-        assert.ok(Math.abs(projected.x) <= 0.961 && Math.abs(projected.y) <= 0.961);
+        assert.ok(Math.abs(projected.x) <= 0.996 && Math.abs(projected.y) <= 0.961);
+        boardWidth = Math.max(boardWidth, Math.abs(projected.x));
       }
+      if (aspect <= 0.56) assert.ok(boardWidth >= 0.99, "phone board should fill at least 99% of screen width");
     }
   }
 });
@@ -70,6 +73,7 @@ test("orientation changes defer the camera while a capture is in progress", () =
   renderer.resize();
   assert.equal(renderer.pendingViewSide, sides.black);
   assert.equal(renderer.controls.enabled, false);
+  close(renderer.controls.minPolarAngle, THREE.MathUtils.degToRad(5));
 });
 
 test("portrait boxes follow capturing sides and preserve stored pieces through layout changes", () => {
