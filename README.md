@@ -2,7 +2,7 @@
 
 ## 🍵 [Play now · 立即游玩](https://tako-xiangqi.netlify.app)
 
-![Xiangqi gameplay](docs/screenshots/game-screenshot.webp)
+![Xiangqi gameplay](docs/screenshots/xiangqi-tea-room-20261118.webp)
 
 Play Chinese chess with a friend in a quiet Japanese-style tea room, or challenge the computer at three difficulty levels.
 
