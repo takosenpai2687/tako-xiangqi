@@ -13,6 +13,7 @@ Play Chinese chess with a friend in a quiet Japanese-style tea room, or challeng
 - Legal-move highlights, undo, restart, and victory detection including checkmate and stalemate.
 - Repetition, perpetual check or chase, and move-count draws are not adjudicated.
 - AI hints with a separate difficulty setting, plus red/black win estimates for reference, not precise predictions.
+- Searches include the played moves for repetition awareness. Easy searches one ply, Normal up to five plies/400 ms, and Hard uses a 900 ms budget without a depth cap; hints and opponents use fresh search caches so deeper analysis does not strengthen Easy.
 - A freely rotatable, zoomable view and interactive tea cups.
 - Portrait screens use an almost top-down overview (5° tilt), with the board filling the phone's width and capture boxes in front of each player.
 - Chinese and English UI with adjustable graphics settings.
@@ -47,6 +48,7 @@ Play Chinese chess with a friend in a quiet Japanese-style tea room, or challeng
 - 合法落点高亮、悔棋、重开，以及包含将死、困毙的胜负判定。
 - 暂不判定重复局面、长将长捉和自然限着和棋。
 - 人机模式提供独立难度的走棋提示与红黑胜率估计；胜率仅供参考，并非精确预测。
+- AI 搜索携带实际棋谱以识别重复局面；简单搜索一层，普通最多五层/400 毫秒，困难使用 900 毫秒预算，不限制搜索层数。提示和对手的着法搜索均清空搜索缓存，避免深度分析抬高简单档棋力。
 - 可自由旋转、缩放视角，还能在思考时喝口茶。
 - 竖屏采用距垂直 5° 的俯视视角，棋盘铺满手机宽度，提子盒横放在各自玩家面前。
 - 支持中英文切换与画面效果设置。

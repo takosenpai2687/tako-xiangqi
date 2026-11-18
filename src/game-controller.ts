@@ -11,6 +11,7 @@ import { Chessboard, constants, getLegalMoves, getLegalSteps } from "./rules";
 import {
   redWinRateFromScore,
   toFen,
+  toUciMove,
   type AiEngine,
   type AiLevel,
   type AiScore,
@@ -70,6 +71,8 @@ export class GameController {
   private winner: "red" | "black" | null = null;
   private moveCount = 0;
   private history: PieceSnapshot[][] = [];
+  private readonly playedMoves: string[] = [];
+  private initialFen: string;
   private lastMove: MoveRecord | null = null;
   private readonly renderer: BoardRenderer;
   private readonly view: GameView;
@@ -147,6 +150,7 @@ export class GameController {
     this.renderer = renderer;
     this.view = view;
     this.board = new Chessboard();
+    this.initialFen = toFen(this.board.state, "red", this.rules.sides.red);
     this.history = [this.snapshot()];
     this.renderer.setActionHandler(action => this.handleBoardAction(action));
     this.renderer.setTeaSoundHandler(sound => this.audio.play(TEA_SOUNDS[sound]));
@@ -186,6 +190,7 @@ export class GameController {
     const plies = this.ai && this.history.length > 2 && this.turn === this.ai.humanSide ? 2 : 1;
     for (let i = 0; i < plies; i++) {
       this.history.pop();
+      this.playedMoves.pop();
       this.moveCount = Math.max(0, this.moveCount - 1);
       this.turn = 1 - this.turn;
     }
@@ -206,6 +211,8 @@ export class GameController {
     this.cancelAi();
     this.ai?.engine.reset();
     this.board = new Chessboard();
+    this.initialFen = toFen(this.board.state, "red", this.rules.sides.red);
+    this.playedMoves.length = 0;
     this.turn = this.rules.sides.red;
     this.selected = null;
     this.legalMoves = [];
@@ -293,6 +300,7 @@ export class GameController {
       to: { row: position.row, col: position.col },
     };
     this.history.push(this.snapshot());
+    this.playedMoves.push(toUciMove(this.lastMove));
     if (this.ai && piece.side === this.aiSide) this.ai.engine.reset();
     this.checkWinner();
     if (this.ai && !this.winner) {
@@ -340,12 +348,10 @@ export class GameController {
     this.aiSearch = (async () => {
       if (previous) await previous;
       if (!isCurrent()) return null;
-      const fen = toFen(
-        this.board.state,
-        this.turn === this.rules.sides.red ? "red" : "black",
-        this.rules.sides.red,
-      );
-      return analysis ? engine.analyze(fen) : engine.search(fen, level);
+      const moves = this.playedMoves.slice();
+      return analysis
+        ? engine.analyze(this.initialFen, 160, moves)
+        : engine.search(this.initialFen, level, moves);
     })().catch(error => {
       console.warn("AI search failed:", error);
       return null;

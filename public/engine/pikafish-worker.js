@@ -1,5 +1,5 @@
 // Classic worker hosting the Pikafish WASM engine (pthreads + SIMD, one search thread).
-// Protocol: main -> {type:"init"} | {type:"search", id, fen, options, go, reset}
+// Protocol: main -> {type:"init"} | {type:"search", id, fen, moves, options, go, reset}
 //           worker -> {type:"progress", value} | {type:"ready"} | {type:"error", message}
 //                     | {type:"bestmove", id, move, score}
 // Emscripten spawns its pthread workers from document.currentScript.src, which does not exist
@@ -114,7 +114,8 @@ self.onmessage = event => {
     for (const [name, value] of Object.entries(data.options)) {
       engine(`setoption name ${name} value ${value}`);
     }
-    engine(`position fen ${data.fen}`);
+    const moves = data.moves?.length ? ` moves ${data.moves.join(" ")}` : "";
+    engine(`position fen ${data.fen}${moves}`);
     // The search runs on a pthread; the result arrives asynchronously via stdout.
     engine(data.go);
   }

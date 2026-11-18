@@ -18,7 +18,7 @@ export interface AiSearchResult {
   score: AiScore | null;
 }
 
-// Kept deliberately light so phones stay responsive: shallow depth plus a hard time cap.
+// Search runs off the UI thread; hard gets more time to resolve tactics and endgames.
 const LEVELS: Record<AiLevel, { options: Record<string, string | number>; go: string }> = {
   easy: {
     options: {},
@@ -30,7 +30,7 @@ const LEVELS: Record<AiLevel, { options: Record<string, string | number>; go: st
   },
   hard: {
     options: {},
-    go: "go depth 10 movetime 900",
+    go: "go movetime 900",
   },
 };
 
@@ -69,6 +69,11 @@ export function parseMove(text: string): AiMove | null {
   };
 }
 
+export function toUciMove(move: AiMove): string {
+  const square = (position: Position) => `${String.fromCharCode(97 + position.col)}${9 - position.row}`;
+  return square(move.from) + square(move.to);
+}
+
 export function redWinRateFromScore(score: AiScore, scoreSide: number, redSide: number): number {
   const scoreSideWinRate = score.type === "mate"
     ? score.value > 0 ? 99 : 1
@@ -88,7 +93,7 @@ export class AiEngine {
     if (this.ready) return this.ready;
     this.ready = new Promise<void>((resolve, reject) => {
       // Version the worker entry: older deployments marked /engine/* immutable.
-      const worker = new Worker(`${import.meta.env.BASE_URL}engine/pikafish-worker.js?v=4`);
+      const worker = new Worker(`${import.meta.env.BASE_URL}engine/pikafish-worker.js?v=5`);
       this.worker = worker;
       worker.onmessage = event => {
         const data = event.data;
@@ -118,13 +123,13 @@ export class AiEngine {
     return this.ready;
   }
 
-  search(fen: string, level: AiLevel): Promise<AiSearchResult | null> {
-    return this.run(fen, LEVELS[level].go, LEVELS[level].options);
+  search(fen: string, level: AiLevel, moves: readonly string[] = []): Promise<AiSearchResult | null> {
+    return this.run(fen, LEVELS[level].go, LEVELS[level].options, moves, true);
   }
 
-  analyze(fen: string, moveTimeMs = 160): Promise<AiSearchResult | null> {
+  analyze(fen: string, moveTimeMs = 160, moves: readonly string[] = []): Promise<AiSearchResult | null> {
     const time = Math.max(50, Math.min(300, Math.floor(moveTimeMs)));
-    return this.run(fen, `go movetime ${time}`);
+    return this.run(fen, `go movetime ${time}`, {}, moves);
   }
 
   reset(): void {
@@ -136,6 +141,8 @@ export class AiEngine {
     fen: string,
     go: string,
     options: Record<string, string | number> = {},
+    moves: readonly string[] = [],
+    freshSearch = false,
   ): Promise<AiSearchResult | null> {
     await this.ready;
     const worker = this.worker;
@@ -143,9 +150,10 @@ export class AiEngine {
     const id = ++this.searchId;
     return new Promise<AiSearchResult | null>(resolve => {
       this.waiting.set(id, resolve);
-      const reset = this.resetPending;
+      // Do not let a hard hint's transposition table strengthen a depth-one opponent.
+      const reset = freshSearch || this.resetPending;
       this.resetPending = false;
-      worker.postMessage({ type: "search", id, fen, options, go, reset });
+      worker.postMessage({ type: "search", id, fen, moves, options, go, reset });
     });
   }
 

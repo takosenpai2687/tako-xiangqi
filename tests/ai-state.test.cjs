@@ -70,8 +70,8 @@ function createGame(humanSide = rules.constants.sides.red) {
   const engine = {
     resets: 0,
     reset() { this.resets++; },
-    search(fen, level) {
-      return new Promise(resolve => searches.push({ fen, level, resolve }));
+    search(fen, level, moves) {
+      return new Promise(resolve => searches.push({ fen, level, moves, resolve }));
     },
   };
   const game = new GameController(renderer, {
@@ -159,18 +159,18 @@ test("engine resets are deferred until the next search and are consumed once", a
   const worker = FakeWorker.latest;
   worker.onmessage({ data: { type: "ready" } });
   await ready;
-  const first = engine.search(initialFen, "normal");
+  const first = engine.analyze(initialFen);
   await flush();
   engine.reset();
   assert.equal(worker.messages.length, 2, "reset must not interrupt an active search");
   worker.onmessage({ data: { type: "bestmove", id: 1, move: "a3a4" } });
   await first;
-  const second = engine.search(initialFen, "normal");
+  const second = engine.analyze(initialFen);
   await flush();
   assert.equal(worker.messages[2].reset, true);
   worker.onmessage({ data: { type: "bestmove", id: 2, move: "a3a4" } });
   await second;
-  const third = engine.search(initialFen, "normal");
+  const third = engine.analyze(initialFen);
   await flush();
   assert.equal(worker.messages[3].reset, false);
   engine.dispose();
@@ -207,6 +207,7 @@ for (const operation of ["undo", "restart"]) {
     assert.equal(fixture.hint(), null);
     await flush();
     assert.equal(searches[1].fen, initialFen);
+    assert.equal(searches[1].moves.length, 0);
     searches[1].resolve(hintResult);
     await newHint;
     assert.equal(fixture.state().selected, game.board.state[6][0]);
@@ -224,7 +225,83 @@ test("worker clears engine history before positioning and searching after a rese
     { self, URL, importScripts() {}, commands },
   );
   self.onmessage({
-    data: { type: "search", id: 1, fen: initialFen, options: {}, go: "go depth 5", reset: true },
+    data: { type: "search", id: 1, fen: initialFen, moves: ["a3a4", "a6a5"], options: {}, go: "go depth 5", reset: true },
   });
-  assert.deepEqual(commands, ["ucinewgame", `position fen ${initialFen}`, "go depth 5"]);
+  assert.deepEqual(commands, ["ucinewgame", `position fen ${initialFen} moves a3a4 a6a5`, "go depth 5"]);
+});
+
+test("hard hints and easy opponents request different budgets with fresh search caches", async () => {
+  const engine = new engineModule.AiEngine();
+  const ready = engine.load();
+  const worker = FakeWorker.latest;
+  worker.onmessage({ data: { type: "ready" } });
+  await ready;
+  for (const [level, go] of [
+    ["hard", "go movetime 900"],
+    ["easy", "go depth 1"],
+    ["normal", "go depth 5 movetime 400"],
+  ]) {
+    const result = engine.search(initialFen, level, ["a3a4", "a6a5"]);
+    await flush();
+    const request = worker.messages.at(-1);
+    assert.equal(request.go, go);
+    assert.equal(request.reset, true, "previous deeper searches must not leak into an easier search");
+    assert.equal(Array.from(request.moves).join(" "), "a3a4 a6a5");
+    worker.onmessage({ data: { type: "bestmove", id: request.id, move: "b0c2" } });
+    await result;
+  }
+  engine.dispose();
+});
+
+test("hints receive actual repeated moves, and undo keeps only the retained branch", async () => {
+  const { game, searches } = createGame();
+  const cycle = [
+    [9, 1, 7, 2], [0, 1, 2, 2], [7, 2, 9, 1], [2, 2, 0, 1],
+  ];
+  for (let repeat = 0; repeat < 2; repeat++) {
+    for (const [row, col, toRow, toCol] of cycle) {
+      const piece = game.board.state[row][col];
+      assert.ok(rules.getLegalSteps(piece, game.board.state).some(step => step.row === toRow && step.col === toCol));
+      game.selected = piece;
+      game.movePiece({ row: toRow, col: toCol });
+    }
+  }
+  const hint = game.requestHint();
+  await flush();
+  assert.equal(searches[0].fen, initialFen);
+  assert.equal(Array.from(searches[0].moves).join(" "), "b0c2 b9c7 c2b0 c7b9 b0c2 b9c7 c2b0 c7b9");
+  searches[0].resolve(hintResult);
+  await hint;
+  game.undo();
+  const revised = game.requestHint();
+  await flush();
+  assert.equal(Array.from(searches[1].moves).join(" "), "b0c2 b9c7 c2b0 c7b9 b0c2 b9c7");
+  searches[1].resolve({ move: { from: { row: 7, col: 2 }, to: { row: 9, col: 1 } }, score: null });
+  await revised;
+});
+
+test("hint rejects opponent moves and leaves no misleading destination", async () => {
+  const fixture = createGame();
+  const pending = fixture.game.requestHint();
+  await flush();
+  fixture.searches[0].resolve({ move: { from: { row: 3, col: 0 }, to: { row: 4, col: 0 } }, score: null });
+  await pending;
+  assert.equal(fixture.hint(), null);
+  assert.equal(fixture.state().hintError, true);
+});
+
+test("win-rate analysis receives the same base position and actual history as hints", async () => {
+  const { game, engine } = createGame();
+  game.selected = game.board.state[6][0];
+  game.movePiece({ row: 5, col: 0 });
+  let analyzed = false;
+  engine.analyze = async (fen, time, moves) => {
+    analyzed = true;
+    assert.equal(fen, initialFen);
+    assert.equal(time, 160);
+    assert.equal(Array.from(moves).join(" "), "a3a4");
+    return null;
+  };
+  await game.searchPosition(engine, "hard", () => true, true);
+  assert.equal(analyzed, true);
 });
