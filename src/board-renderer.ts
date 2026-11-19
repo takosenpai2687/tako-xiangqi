@@ -558,7 +558,9 @@ export class BoardRenderer {
 
   private buildEnvironment(): void {
     // Low diffuse fill only; the room's 3200K ceiling lamp is the key light.
-    const ambient = new THREE.HemisphereLight("#f1e2cd", "#6b5f52", 0.6);
+    // Phone screens are small and often viewed in bright surroundings: lift the fill there.
+    const fillScale = this.touchDevice.matches ? 1.35 : 1;
+    const ambient = new THREE.HemisphereLight("#f1e2cd", "#6b5f52", 0.6 * fillScale);
     this.scene.add(ambient, new THREE.AmbientLight("#d6cdbf", 0.06));
 
     const keyLight = new THREE.DirectionalLight("#ffe6c6", 0.36);
@@ -578,7 +580,7 @@ export class BoardRenderer {
     keyLight.shadow.camera.updateProjectionMatrix();
     this.scene.add(keyLight);
 
-    const fillLight = new THREE.DirectionalLight("#dfe0dc", 0.26);
+    const fillLight = new THREE.DirectionalLight("#dfe0dc", 0.26 * fillScale);
     fillLight.position.set(6, 9, 7);
     this.scene.add(fillLight);
 
